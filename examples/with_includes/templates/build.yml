@@ -1,0 +1,10 @@
+.python_job:
+  image: python:3.12
+  before_script:
+    - pip install -e .
+
+build_app:
+  stage: build
+  extends: .python_job
+  script:
+    - python -m build

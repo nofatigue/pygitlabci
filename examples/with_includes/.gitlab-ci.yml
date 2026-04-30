@@ -1,0 +1,23 @@
+include:
+  - local: templates/build.yml
+  - local: templates/deploy.yml
+
+stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  APP_NAME: demo
+
+.shared_script: &shared
+  - echo "$APP_NAME"
+  - date
+
+unit_test:
+  stage: test
+  extends: .python_job
+  script:
+    - *shared
+    - !reference [.python_job, before_script]
+    - pytest

@@ -1,0 +1,11 @@
+stages:
+  - work
+
+work_a:
+  stage: work
+  script: ["echo a"]
+
+work_b:
+  stage: work
+  needs: ["work_a"]
+  script: ["echo b"]

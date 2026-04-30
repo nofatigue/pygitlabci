@@ -1,0 +1,19 @@
+stages:
+  - generate
+  - run
+
+generator:
+  stage: generate
+  script:
+    - python generate.py > child.yml
+  artifacts:
+    paths: [child.yml]
+
+trigger_child:
+  stage: run
+  needs: ["generator"]
+  trigger:
+    include:
+      - artifact: child.yml
+        job: generator
+    strategy: depend

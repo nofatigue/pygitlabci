@@ -1,0 +1,46 @@
+stages:
+  - build
+  - test
+  - deploy
+
+compile:
+  stage: build
+  script: ["make compile"]
+
+assets:
+  stage: build
+  script: ["make assets"]
+
+unit_test:
+  stage: test
+  needs: ["compile"]
+  script: ["make unit"]
+
+integration_test:
+  stage: test
+  needs:
+    - job: compile
+    - job: assets
+  script: ["make integration"]
+
+deploy_staging:
+  stage: deploy
+  needs:
+    - job: unit_test
+    - job: integration_test
+  script: ["deploy staging"]
+
+deploy_prod:
+  stage: deploy
+  needs:
+    - job: deploy_staging
+  when: manual
+  script: ["deploy prod"]
+
+cleanup:
+  stage: deploy
+  needs:
+    - job: deploy_staging
+      optional: true
+  when: always
+  script: ["cleanup"]
