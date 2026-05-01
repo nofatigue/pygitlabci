@@ -99,9 +99,21 @@ form.inline { display: inline-flex; gap: 0.25rem; }
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 1rem;
-  overflow-x: auto;
+  max-height: 75vh;
+  overflow: auto;
+  resize: vertical;
 }
-.mermaid { margin: 0; }
+.mermaid {
+  margin: 0;
+  width: 100%;
+  text-align: center;
+}
+.mermaid svg {
+  max-width: 100%;
+  width: 100%;
+  height: auto;
+  display: block;
+}
 
 table.jobs {
   width: 100%;

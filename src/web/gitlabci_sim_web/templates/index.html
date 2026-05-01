@@ -7,7 +7,14 @@
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script type="module">
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'neutral',
+      securityLevel: 'loose',
+      flowchart: { useMaxWidth: true, htmlLabels: true, nodeSpacing: 30, rankSpacing: 40 },
+      maxTextSize: 500000,
+      maxEdges: 5000,
+    });
     async function rerender() {
       const nodes = document.querySelectorAll('.mermaid');
       if (!nodes.length) return;
