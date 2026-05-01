@@ -35,7 +35,10 @@ def render_dag(pipeline: Pipeline, runs: dict[str, JobRun]) -> str:
         jobs = by_stage.get(stage, [])
         if not jobs:
             continue
-        lines.append(f"  subgraph {_mermaid_id(stage)}[{stage}]")
+        # Prefix the subgraph id so it can't collide with a job that shares the
+        # stage's name (e.g. a `lint` job in a `lint` stage — Mermaid uses one
+        # namespace for subgraphs and nodes, and a duplicate id is a parse error).
+        lines.append(f"  subgraph s_{_mermaid_id(stage)}[{stage}]")
         for job_name in jobs:
             lines.append(f"    {_mermaid_id(job_name)}[{job_name}]")
         lines.append("  end")
