@@ -66,8 +66,11 @@ def _recompute(state: PipelineState) -> PipelineState:
             if not _any_real_failure(pipe, upstream[name], runs):
                 runs[name] = JobRun(name=name, status="skipped")
                 continue
-        elif job.when == "on_success":
-            if _any_real_failure(pipe, upstream[name], runs):
+        elif job.when in {"on_success", "manual", "delayed"}:
+            # A skipped or non-allow_failure failed upstream blocks success-gated jobs,
+            # including manual ones (the user can't trigger work that depends on
+            # something which never happened).
+            if _any_blocking(pipe, upstream[name], runs):
                 runs[name] = JobRun(name=name, status="skipped")
                 continue
         ready.append(name)
@@ -117,6 +120,24 @@ def _any_real_failure(pipe: Pipeline, ups: list[str], runs: dict[str, JobRun]) -
         if up_job and up_job.allow_failure:
             continue
         return True
+    return False
+
+
+def _any_blocking(pipe: Pipeline, ups: list[str], runs: dict[str, JobRun]) -> bool:
+    """True iff any upstream completed in a way that prevents a success-gated downstream
+    from running: a non-allow_failure failure, or a skipped job (which never produced
+    its outputs)."""
+    for up in ups:
+        run = runs.get(up)
+        if run is None:
+            continue
+        if run.status == "skipped":
+            return True
+        if run.status == "failed":
+            up_job = pipe.jobs.get(up)
+            if up_job and up_job.allow_failure:
+                continue
+            return True
     return False
 
 
