@@ -1,0 +1,61 @@
+<div id="session" data-session-id="{{ session.id }}">
+  <div class="toolbar">
+    <span class="badge">session {{ session.id }}</span>
+    {% if session.state.finished %}
+      <span class="badge done">finished</span>
+    {% endif %}
+    <form class="inline" hx-post="/sessions/{{ session.id }}/reset" hx-target="#panel">
+      <button type="submit">Reset</button>
+    </form>
+    <a class="button" href="/sessions/{{ session.id }}/state.json">Download state.json</a>
+  </div>
+
+  {% if session.warnings %}
+    <ul class="warnings">
+      {% for w in session.warnings %}<li>{{ w }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+
+  <h2>Ready</h2>
+  <p class="ready">
+    {% if session.state.ready %}
+      {% for j in session.state.ready %}<code>{{ j }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+    {% else %}
+      <em>(none)</em>
+    {% endif %}
+  </p>
+
+  <h2>DAG</h2>
+  <div class="dag-wrap">
+    <pre class="mermaid" data-source="{{ mermaid_source }}">{{ mermaid_source }}</pre>
+  </div>
+
+  <h2>Jobs</h2>
+  <table class="jobs">
+    <thead>
+      <tr><th>stage</th><th>job</th><th>when</th><th>status</th><th>actions</th></tr>
+    </thead>
+    <tbody>
+    {% for stage in session.pipeline.stages %}
+      {% for job in jobs_by_stage.get(stage, []) %}
+        {% set run = session.state.runs[job.name] %}
+        <tr class="status-{{ run.status }}">
+          <td>{{ stage }}</td>
+          <td><code>{{ job.name }}</code></td>
+          <td class="dim">{{ job.when }}</td>
+          <td><span class="status-pill status-{{ run.status }}">{{ run.status }}</span></td>
+          <td>
+            {% if job.name in session.state.ready %}
+              <form class="inline" hx-post="/sessions/{{ session.id }}/apply" hx-target="#panel">
+                <input type="hidden" name="job" value="{{ job.name }}">
+                <button name="status" value="success" title="mark success">✓</button>
+                <button name="status" value="failed" title="mark failed">✗</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    {% endfor %}
+    </tbody>
+  </table>
+</div>

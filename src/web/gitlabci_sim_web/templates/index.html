@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>gitlabci-sim</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+    async function rerender() {
+      const nodes = document.querySelectorAll('.mermaid');
+      if (!nodes.length) return;
+      nodes.forEach(n => { n.removeAttribute('data-processed'); n.innerHTML = n.dataset.source || n.textContent; });
+      await mermaid.run({ nodes });
+    }
+    document.body.addEventListener('htmx:afterSwap', rerender);
+    document.addEventListener('DOMContentLoaded', rerender);
+  </script>
+</head>
+<body>
+  <header>
+    <h1>gitlabci-sim</h1>
+    <p class="muted">Load a <code>.gitlab-ci.yml</code> from a server-side path, then click through it.</p>
+  </header>
+
+  <section id="loader">
+    <form hx-post="/sessions" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loading">
+      <div class="row">
+        <label>Path
+          <input name="path" required value="examples/furniture" placeholder="path/to/folder or .gitlab-ci.yml">
+        </label>
+        <label>Ref
+          <input name="ref" value="main">
+        </label>
+        <label>Source
+          <input name="source" value="push">
+        </label>
+      </div>
+      <div class="row">
+        <label>Vars (KEY=VALUE per line)
+          <textarea name="vars" rows="3"></textarea>
+        </label>
+        <label>Changed files (one per line)
+          <textarea name="changed" rows="3"></textarea>
+        </label>
+      </div>
+      <button type="submit">Load pipeline</button>
+      <span id="loading" class="htmx-indicator">loading…</span>
+    </form>
+  </section>
+
+  <main id="panel"></main>
+</body>
+</html>
