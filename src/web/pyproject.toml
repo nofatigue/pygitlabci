@@ -1,0 +1,38 @@
+[project]
+name = "gitlabci-sim-web"
+version = "0.1.0"
+description = "Web GUI for the GitLab CI simulator"
+authors = [
+    { name = "Ofir", email = "nofatigua@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "gitlabci-sim",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+sim-web = "gitlabci_sim_web.app:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["gitlabci_sim_web"]
+
+[tool.uv.sources]
+gitlabci-sim = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
