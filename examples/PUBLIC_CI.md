@@ -1,9 +1,11 @@
-# Public-CI fixtures
+# Public-CI examples
 
-Each subdirectory holds a real `.gitlab-ci.yml` snapshot from a public
-GitLab project, mirrored to GitHub at the time of fetch. Use them as a
-smoke-test corpus: the engine should compile every one of these into
-a non-empty Pipeline without raising.
+Each `<owner>__<repo>` subdirectory in `examples/` (alongside this file)
+holds a real `.gitlab-ci.yml` snapshot from a public GitLab project,
+mirrored to GitHub at the time of fetch. Browse them with `sim-web`, or
+use them as a smoke-test corpus — the engine compiles every one into a
+non-empty Pipeline without raising (covered by
+`src/web/tests/test_public_ci.py`).
 
 Refresh with `scratch/fetch_probes.sh` then `scratch/install_fixtures.sh`.
 

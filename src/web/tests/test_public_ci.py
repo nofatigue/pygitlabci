@@ -1,11 +1,10 @@
 """Smoke-test the engine against real-world `.gitlab-ci.yml` snapshots from
 public GitLab projects.
 
-Fixtures live under `tests/fixtures/public_ci/<slug>/.gitlab-ci.yml` (see
-`SOURCES.md` in that directory for provenance). Each one was selected
-because it compiles to a non-empty Pipeline without dragging in the rest of
-its repo — i.e. its `extends:` chains and `!reference` paths resolve from
-the root file alone.
+Each `examples/<owner>__<repo>/` directory holds a fetched snapshot — see
+`examples/PUBLIC_CI.md` for provenance. Selection criterion: compiles to a
+non-empty Pipeline from the root file alone (no project-include resolution
+required).
 
 Refresh the corpus with `scratch/fetch_probes.sh` then
 `scratch/install_fixtures.sh`.
@@ -21,13 +20,14 @@ from gitlabci_sim.includes import resolve_includes
 from gitlabci_sim.loader import resolve_references
 from gitlabci_sim.variables import Context
 
-FIXTURES = Path(__file__).parent / "fixtures" / "public_ci"
-SLUGS = sorted(p.name for p in FIXTURES.iterdir() if p.is_dir())
+REPO_ROOT = Path(__file__).resolve().parents[3]
+EXAMPLES = REPO_ROOT / "examples"
+SLUGS = sorted(p.name for p in EXAMPLES.iterdir() if "__" in p.name and (p / ".gitlab-ci.yml").exists())
 
 
 @pytest.mark.parametrize("slug", SLUGS, ids=SLUGS)
 def test_real_world_pipeline_compiles(slug: str) -> None:
-    yaml_path = FIXTURES / slug / ".gitlab-ci.yml"
+    yaml_path = EXAMPLES / slug / ".gitlab-ci.yml"
     assert yaml_path.exists(), f"missing fixture: {yaml_path}"
 
     res = resolve_includes(yaml_path)
@@ -40,8 +40,6 @@ def test_real_world_pipeline_compiles(slug: str) -> None:
 
     assert pipeline.jobs, f"{slug}: pipeline has no jobs"
     assert pipeline.stages, f"{slug}: pipeline has no stages"
-    # Every job's stage must be declared up top — sanity check that the
-    # compiler produced an internally consistent Pipeline.
     declared = set(pipeline.stages)
     for name, job in pipeline.jobs.items():
         assert job.stage in declared, f"{slug}: job {name!r} on undeclared stage {job.stage!r}"
