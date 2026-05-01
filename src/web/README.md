@@ -10,18 +10,24 @@ no build step.
 From the repo root:
 
 ```sh
-uv sync --all-packages --all-extras   # one-time
-uv run sim-web                        # serves on http://127.0.0.1:8765
+uv sync --all-packages --all-extras       # one-time
+uv run sim-web                            # serves on http://127.0.0.1:8765
+uv run sim-web --examples /some/dir       # browse a different folder
+uv run sim-web --host 0.0.0.0 --port 9000
 ```
 
-Open http://127.0.0.1:8765 in a browser, type a path to a folder containing
-`.gitlab-ci.yml` (try `examples/furniture`), and click **Load pipeline**.
+Open http://127.0.0.1:8765 in a browser. You'll see a list of every
+project in the examples folder (anything containing a `.gitlab-ci.yml`)
+as click-to-load buttons, plus a "Load by path" form for ad-hoc YAML
+files anywhere on disk.
 
 ## What you get
 
+- **Example browser:** every project in `--examples PATH` (default
+  `./examples`) shows as a click-to-load button on the index page.
 - **DAG view:** Mermaid `graph LR`, color-coded by run status.
-- **Jobs table:** stage / job / when / status, with ✓ / ✗ buttons on every
-  ready job.
+- **Per-stage panels:** one section per stage, with `✓ all ready` / `✗ all
+  ready` buttons that flip every ready job in that stage in one apply.
 - **Ready panel:** the same headline list the CLI's interactive mode shows.
 - **Reset:** rebuild the initial state (without re-reading the YAML).
 - **Download state.json:** the full `PipelineState`, same shape as the CLI's
@@ -60,5 +66,5 @@ tests/          # pytest, httpx TestClient
 ## Tests
 
 ```sh
-uv run pytest src/web        # 19 tests
+uv run pytest src/web
 ```

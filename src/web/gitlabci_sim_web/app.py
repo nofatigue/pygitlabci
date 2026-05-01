@@ -1,6 +1,7 @@
 """FastAPI app + uvicorn entrypoint (`sim-web`)."""
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from fastapi import FastAPI, Form, HTTPException, Request
@@ -19,6 +20,28 @@ templates = Jinja2Templates(directory=str(_HERE / "templates"))
 store = SessionStore()
 app = FastAPI(title="gitlabci-sim-web")
 app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static")
+
+
+@dataclass
+class Config:
+    examples_path: Path = field(default_factory=lambda: Path("examples").resolve())
+
+
+CONFIG = Config()
+
+
+def _list_examples() -> list[dict[str, str]]:
+    """Subdirectories of CONFIG.examples_path that contain a .gitlab-ci.yml."""
+    root = CONFIG.examples_path
+    if not root.is_dir():
+        return []
+    out: list[dict[str, str]] = []
+    for p in sorted(root.iterdir()):
+        if not p.is_dir():
+            continue
+        if (p / ".gitlab-ci.yml").exists() or (p / ".gitlab-ci.yaml").exists():
+            out.append({"name": p.name, "path": str(p)})
+    return out
 
 
 def _parse_kv_lines(text: str) -> dict[str, str]:
@@ -65,7 +88,14 @@ def _error(request: Request, message: str) -> HTMLResponse:
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "index.html", {})
+    return templates.TemplateResponse(
+        request,
+        "index.html",
+        {
+            "examples": _list_examples(),
+            "examples_path": str(CONFIG.examples_path),
+        },
+    )
 
 
 @app.post("/sessions", response_class=HTMLResponse)
@@ -155,11 +185,23 @@ def state_json(session_id: str) -> Response:
 
 
 def main() -> None:
+    import argparse
+
     import uvicorn
 
-    uvicorn.run(
-        "gitlabci_sim_web.app:app",
-        host="127.0.0.1",
-        port=8765,
-        reload=False,
+    parser = argparse.ArgumentParser(
+        prog="sim-web",
+        description="Browse and step through GitLab CI pipelines in a browser.",
     )
+    parser.add_argument(
+        "--examples",
+        default="examples",
+        metavar="PATH",
+        help="Folder to scan for browsable example projects (default: ./examples)",
+    )
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8765)
+    args = parser.parse_args()
+
+    CONFIG.examples_path = Path(args.examples).expanduser().resolve()
+    uvicorn.run(app, host=args.host, port=args.port)

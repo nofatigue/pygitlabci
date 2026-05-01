@@ -28,14 +28,36 @@
 <body>
   <header>
     <h1>gitlabci-sim</h1>
-    <p class="muted">Load a <code>.gitlab-ci.yml</code> from a server-side path, then click through it.</p>
+    <p class="muted">Pick an example below, or load any <code>.gitlab-ci.yml</code> by path.</p>
   </header>
 
+  <section id="examples">
+    <div class="examples-header">
+      <h3>Examples</h3>
+      <code class="muted">{{ examples_path }}</code>
+    </div>
+    {% if examples %}
+      <ul class="examples-list">
+        {% for ex in examples %}
+          <li>
+            <form class="inline" hx-post="/sessions" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loading">
+              <input type="hidden" name="path" value="{{ ex.path }}">
+              <button type="submit">{{ ex.name }}</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">No example projects found. Drop a folder containing <code>.gitlab-ci.yml</code> into the examples directory, or pass <code>--examples PATH</code> to <code>sim-web</code>.</p>
+    {% endif %}
+  </section>
+
   <section id="loader">
+    <h3>Load by path</h3>
     <form hx-post="/sessions" hx-target="#panel" hx-swap="innerHTML" hx-indicator="#loading">
       <div class="row">
         <label>Path
-          <input name="path" required value="examples/furniture" placeholder="path/to/folder or .gitlab-ci.yml">
+          <input name="path" required placeholder="path/to/folder or .gitlab-ci.yml">
         </label>
         <label>Ref
           <input name="ref" value="main">

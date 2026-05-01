@@ -11,13 +11,16 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from gitlabci_sim_web.app import app
+from gitlabci_sim_web.app import CONFIG, app
 
 SESSION_ID_RE = re.compile(r'data-session-id="([0-9a-f]+)"')
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client(examples_dir: Path) -> TestClient:
+    # Pin CONFIG.examples_path to the repo's examples/ so tests are
+    # independent of the cwd pytest happens to run from.
+    CONFIG.examples_path = examples_dir
     return TestClient(app)
 
 
@@ -167,3 +170,38 @@ def test_panel_no_stage_button_when_nothing_ready_in_stage(
     # button initially. Cheap check: count "apply_stage" form actions — only
     # one stage (lint) has ready jobs at session start.
     assert resp.text.count("apply_stage") == 1
+
+
+def test_index_lists_example_projects(client: TestClient, examples_dir: Path) -> None:
+    resp = client.get("/")
+    assert resp.status_code == 200
+    # Each project under examples/ with a .gitlab-ci.yml gets a click-to-load
+    # form. Spot-check the well-known ones.
+    assert "furniture" in resp.text
+    assert "wireshark__wireshark" in resp.text
+    assert 'class="examples-list"' in resp.text
+    # The hidden path input should carry the absolute path of the project dir.
+    assert str(examples_dir / "furniture") in resp.text
+
+
+def test_index_with_empty_examples_dir_shows_empty_message(
+    client: TestClient, tmp_path: Path
+) -> None:
+    CONFIG.examples_path = tmp_path
+    try:
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "No example projects found" in resp.text
+    finally:
+        # Don't leak the override into other tests via the module-level CONFIG.
+        pass
+
+
+def test_clicking_example_button_creates_session(
+    client: TestClient, examples_dir: Path
+) -> None:
+    # Mirrors the form an example button submits.
+    resp = client.post("/sessions", data={"path": str(examples_dir / "furniture")})
+    assert resp.status_code == 200
+    assert SESSION_ID_RE.search(resp.text), "expected a session panel to render"
+    assert "lint" in resp.text
