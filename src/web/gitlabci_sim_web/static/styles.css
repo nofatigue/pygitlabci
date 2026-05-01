@@ -135,5 +135,27 @@ table.jobs td.dim { color: var(--muted); }
 .status-pill.status-manual   { background: #fff4c5; color: #6b5300; }
 .status-pill.status-skipped  { background: #eee; color: #555; }
 
+section.stage {
+  margin: 1.25rem 0;
+}
+section.stage .stage-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+section.stage h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+section.stage h3 .muted {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-left: 0.25rem;
+}
+
 .htmx-indicator { display: none; color: var(--muted); margin-left: 0.5rem; }
 .htmx-request .htmx-indicator { display: inline; }

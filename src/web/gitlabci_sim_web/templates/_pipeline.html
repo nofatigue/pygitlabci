@@ -31,31 +31,46 @@
   </div>
 
   <h2>Jobs</h2>
-  <table class="jobs">
-    <thead>
-      <tr><th>stage</th><th>job</th><th>when</th><th>status</th><th>actions</th></tr>
-    </thead>
-    <tbody>
-    {% for stage in session.pipeline.stages %}
-      {% for job in jobs_by_stage.get(stage, []) %}
-        {% set run = session.state.runs[job.name] %}
-        <tr class="status-{{ run.status }}">
-          <td>{{ stage }}</td>
-          <td><code>{{ job.name }}</code></td>
-          <td class="dim">{{ job.when }}</td>
-          <td><span class="status-pill status-{{ run.status }}">{{ run.status }}</span></td>
-          <td>
-            {% if job.name in session.state.ready %}
-              <form class="inline" hx-post="/sessions/{{ session.id }}/apply" hx-target="#panel">
-                <input type="hidden" name="job" value="{{ job.name }}">
-                <button name="status" value="success" title="mark success">✓</button>
-                <button name="status" value="failed" title="mark failed">✗</button>
-              </form>
-            {% endif %}
-          </td>
-        </tr>
-      {% endfor %}
-    {% endfor %}
-    </tbody>
-  </table>
+  {% for stage in session.pipeline.stages %}
+    {% set jobs = jobs_by_stage.get(stage, []) %}
+    {% if jobs %}
+      {% set ready_count = ready_by_stage.get(stage, 0) %}
+      <section class="stage" data-stage="{{ stage }}">
+        <header class="stage-header">
+          <h3>{{ stage }} <span class="muted">({{ jobs | length }} job{{ '' if jobs|length == 1 else 's' }}{% if ready_count %}, {{ ready_count }} ready{% endif %})</span></h3>
+          {% if ready_count %}
+            <form class="inline" hx-post="/sessions/{{ session.id }}/apply_stage" hx-target="#panel">
+              <input type="hidden" name="stage" value="{{ stage }}">
+              <button name="status" value="success" title="mark all ready jobs in this stage as success">✓ all ready ({{ ready_count }})</button>
+              <button name="status" value="failed" title="mark all ready jobs in this stage as failed">✗ all ready ({{ ready_count }})</button>
+            </form>
+          {% endif %}
+        </header>
+        <table class="jobs">
+          <thead>
+            <tr><th>job</th><th>when</th><th>status</th><th>actions</th></tr>
+          </thead>
+          <tbody>
+          {% for job in jobs %}
+            {% set run = session.state.runs[job.name] %}
+            <tr class="status-{{ run.status }}">
+              <td><code>{{ job.name }}</code></td>
+              <td class="dim">{{ job.when }}</td>
+              <td><span class="status-pill status-{{ run.status }}">{{ run.status }}</span></td>
+              <td>
+                {% if job.name in session.state.ready %}
+                  <form class="inline" hx-post="/sessions/{{ session.id }}/apply" hx-target="#panel">
+                    <input type="hidden" name="job" value="{{ job.name }}">
+                    <button name="status" value="success" title="mark success">✓</button>
+                    <button name="status" value="failed" title="mark failed">✗</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    {% endif %}
+  {% endfor %}
 </div>

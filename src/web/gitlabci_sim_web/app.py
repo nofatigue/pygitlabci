@@ -42,6 +42,11 @@ def _panel(request: Request, session: Session) -> HTMLResponse:
     by_stage: dict[str, list] = {s: [] for s in session.pipeline.stages}
     for job in session.pipeline.jobs.values():
         by_stage.setdefault(job.stage, []).append(job)
+    ready = set(session.state.ready)
+    ready_by_stage: dict[str, int] = {
+        stage: sum(1 for job in jobs if job.name in ready)
+        for stage, jobs in by_stage.items()
+    }
     return templates.TemplateResponse(
         request,
         "_pipeline.html",
@@ -49,6 +54,7 @@ def _panel(request: Request, session: Session) -> HTMLResponse:
             "session": session,
             "mermaid_source": render_dag(session.pipeline, session.state.runs),
             "jobs_by_stage": by_stage,
+            "ready_by_stage": ready_by_stage,
         },
     )
 
@@ -103,6 +109,26 @@ def apply_action(
         session = store.apply(session_id, {job: status})  # type: ignore[dict-item]
     except KeyError as e:
         return _error(request, f"unknown job: {e}")
+    return _panel(request, session)
+
+
+@app.post("/sessions/{session_id}/apply_stage", response_class=HTMLResponse)
+def apply_stage(
+    request: Request,
+    session_id: str,
+    stage: str = Form(...),
+    status: str = Form(...),
+) -> HTMLResponse:
+    try:
+        session = store.get(session_id)
+    except KeyError:
+        return _error(request, "session expired — reload the pipeline")
+    affected = {
+        name: status  # type: ignore[misc]
+        for name in session.state.ready
+        if session.pipeline.jobs[name].stage == stage
+    }
+    session = store.apply(session_id, affected)  # empty dict is a safe no-op
     return _panel(request, session)
 
 

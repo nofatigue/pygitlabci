@@ -112,3 +112,58 @@ def test_create_with_malformed_vars_renders_error(
     assert resp.status_code == 200
     assert "error" in resp.text.lower()
     assert "KEY=VALUE" in resp.text or "key=value" in resp.text.lower()
+
+
+def test_apply_stage_marks_every_ready_job_in_the_stage(
+    client: TestClient, furniture_path: str
+) -> None:
+    sid = _create(client, furniture_path)
+    # Get past the lint gate so the build stage has many ready jobs.
+    client.post(f"/sessions/{sid}/apply", data={"job": "lint", "status": "success"})
+    resp = client.post(
+        f"/sessions/{sid}/apply_stage", data={"stage": "build", "status": "success"}
+    )
+    assert resp.status_code == 200
+
+    state = client.get(f"/sessions/{sid}/state.json").json()
+    build_jobs = [
+        name for name, job in state["pipeline"]["jobs"].items() if job["stage"] == "build"
+    ]
+    assert build_jobs, "expected at least one build job"
+    assert all(state["runs"][n]["status"] == "success" for n in build_jobs)
+
+
+def test_apply_stage_with_no_ready_jobs_is_a_safe_noop(
+    client: TestClient, furniture_path: str
+) -> None:
+    sid = _create(client, furniture_path)
+    # No jobs in the `deploy` stage are ready yet — endpoint should re-render
+    # without erroring.
+    resp = client.post(
+        f"/sessions/{sid}/apply_stage", data={"stage": "deploy", "status": "success"}
+    )
+    assert resp.status_code == 200
+    state = client.get(f"/sessions/{sid}/state.json").json()
+    assert state["runs"]["lint"]["status"] in {"pending", "manual"}
+
+
+def test_panel_renders_per_stage_sections(client: TestClient, furniture_path: str) -> None:
+    resp = client.post("/sessions", data={"path": furniture_path})
+    assert resp.status_code == 200
+    # One <section class="stage" data-stage="..."> per non-empty stage.
+    assert 'data-stage="lint"' in resp.text
+    assert 'data-stage="build"' in resp.text
+    assert 'data-stage="test"' in resp.text
+    assert 'data-stage="deploy"' in resp.text
+    # Stage-level "all ready" button only appears when something is ready.
+    assert "all ready" in resp.text  # lint stage has 1 ready job initially
+
+
+def test_panel_no_stage_button_when_nothing_ready_in_stage(
+    client: TestClient, furniture_path: str
+) -> None:
+    resp = client.post("/sessions", data={"path": furniture_path})
+    # The deploy section is rendered but should not have its own "all ready"
+    # button initially. Cheap check: count "apply_stage" form actions — only
+    # one stage (lint) has ready jobs at session start.
+    assert resp.text.count("apply_stage") == 1
