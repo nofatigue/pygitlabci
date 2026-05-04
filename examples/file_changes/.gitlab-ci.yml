@@ -1,0 +1,115 @@
+# A pipeline whose job set is shaped by which files an MR (or push) touches.
+#
+# Try it:
+#   sim mr examples/file_changes --changed src/api/handler.py
+#   sim mr examples/file_changes --changed web/src/App.tsx --changed docs/README.md
+#   sim run examples/file_changes --ref main --source push   # default-branch deploys
+#   sim run examples/file_changes --ref v1.2.3 --source tag  # prod release flow
+
+stages:
+  - lint
+  - build
+  - test
+  - deploy
+
+# Reusable rule fragments so individual jobs stay readable.
+.rules:
+  on_mr: &on_mr
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  on_default_branch: &on_default_branch
+    if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  on_tag: &on_tag
+    if: $CI_COMMIT_TAG
+
+# ---- lint ---------------------------------------------------------------
+
+lint:python:
+  stage: lint
+  script:
+    - ruff check .
+  rules:
+    - changes:
+        - "**/*.py"
+
+lint:js:
+  stage: lint
+  script:
+    - eslint web/
+  rules:
+    - changes:
+        - "web/**/*.js"
+        - "web/**/*.jsx"
+        - "web/**/*.ts"
+        - "web/**/*.tsx"
+
+lint:docs:
+  stage: lint
+  script:
+    - markdownlint docs/ README.md
+  rules:
+    - changes:
+        - "**/*.md"
+        - "docs/**"
+
+# ---- build --------------------------------------------------------------
+
+build:backend:
+  stage: build
+  script:
+    - python -m build
+  rules:
+    # Build the backend if any python source moved, or always on default branch.
+    - changes:
+        - "src/**/*.py"
+        - "pyproject.toml"
+    - <<: *on_default_branch
+
+build:frontend:
+  stage: build
+  script:
+    - cd web && yarn build
+  rules:
+    - changes:
+        - "web/**"
+    - <<: *on_default_branch
+
+# ---- test ---------------------------------------------------------------
+
+test:unit:
+  stage: test
+  script:
+    - pytest
+  rules:
+    # Only worth running unit tests when actual source moved (or on default branch).
+    - changes:
+        - "src/**/*.py"
+        - "tests/**/*.py"
+        - "web/**/*.ts"
+        - "web/**/*.tsx"
+    - <<: *on_default_branch
+
+test:integration:
+  stage: test
+  script:
+    - ./scripts/integration.sh
+  rules:
+    # Integration suite is heavy — only run it on MRs and on the default branch.
+    - <<: *on_mr
+    - <<: *on_default_branch
+
+# ---- deploy -------------------------------------------------------------
+
+deploy:staging:
+  stage: deploy
+  script:
+    - ./scripts/deploy.sh staging
+  rules:
+    - <<: *on_default_branch
+
+deploy:prod:
+  stage: deploy
+  script:
+    - ./scripts/deploy.sh prod
+  rules:
+    - <<: *on_tag
+      when: manual

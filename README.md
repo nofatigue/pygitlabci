@@ -44,6 +44,19 @@ uv run sim run examples/needs_dag
 Interactive table of ready jobs. Type `pass 1` (or `pass <name>`), `fail 1`, `skip 1`,
 `state`, `show <name>`, `save out.json`, `quit`.
 
+### Simulate an MR with given changes
+
+```sh
+uv run sim mr examples/file_changes \
+  --source-branch feature/widgets --target-branch main \
+  --changed src/api/handler.py --changed tests/test_api.py
+```
+
+Sets `CI_PIPELINE_SOURCE=merge_request_event`, populates the
+`CI_MERGE_REQUEST_*` predefined variables, omits `CI_COMMIT_BRANCH` (matching
+real GitLab MR pipelines), and feeds the listed paths into `rules:changes:`
+evaluation. Same `--results`, `--state-in/out` scriptable flags as `run`.
+
 ### Scriptable run
 
 ```sh
