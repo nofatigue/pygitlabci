@@ -1,7 +1,8 @@
 [project]
 name = "gitlabci-sim"
-version = "0.1.0"
+version = "0.2.0"
 description = "Simulate GitLab CI pipelines from a folder of YAML files"
+readme = "README.md"
 authors = [
     { name = "Ofir", email = "nofatigua@gmail.com" }
 ]
@@ -15,15 +16,23 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+web = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+]
 dev = [
     "pytest>=8",
     "syrupy>=4",
     "ruff>=0.6",
     "mypy>=1.10",
+    "httpx>=0.27",
 ]
 
 [project.scripts]
 sim = "gitlabci_sim.cli:app"
+sim-web = "gitlabci_sim.web.app:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -31,9 +40,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/gitlabci_sim"]
-
-[tool.uv.workspace]
-members = ["src/web"]
 
 [tool.ruff]
 line-length = 100
@@ -45,6 +51,7 @@ ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/gitlabci_sim/cli.py" = ["B008"]  # typer requires call-in-default
+"src/gitlabci_sim/web/app.py" = ["B008"]  # FastAPI requires Form(...) in defaults
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -4,9 +4,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from gitlabci_sim_web.sessions import SessionStore
 
 from gitlabci_sim.variables import Context
+from gitlabci_sim.web.sessions import SessionStore
 
 
 @pytest.fixture

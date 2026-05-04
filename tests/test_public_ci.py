@@ -20,8 +20,7 @@ from gitlabci_sim.includes import resolve_includes
 from gitlabci_sim.loader import resolve_references
 from gitlabci_sim.variables import Context
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-EXAMPLES = REPO_ROOT / "examples"
+EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 SLUGS = sorted(p.name for p in EXAMPLES.iterdir() if "__" in p.name and (p / ".gitlab-ci.yml").exists())
 
 

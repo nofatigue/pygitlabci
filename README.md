@@ -89,6 +89,24 @@ uv run sim graph examples/needs_dag
 
 Outputs Mermaid (`graph LR ...`); paste into any Mermaid renderer.
 
+## Web UI (optional `[web]` extra)
+
+```sh
+uv sync --extra web                          # or: pip install gitlabci-sim[web]
+uv run sim-web                               # http://127.0.0.1:8765
+uv run sim-web --examples /some/folder       # browse a different examples dir
+uv run sim-web --host 0.0.0.0 --port 9000
+```
+
+The index page lists every project in the examples folder (anything with
+a `.gitlab-ci.yml`) as click-to-load buttons, plus a manual "Load by
+path" form. Each session shows a Mermaid DAG color-coded by status,
+per-stage panels with bulk `✓ all ready` / `✗ all ready` buttons, and a
+download for the full `PipelineState` JSON.
+
+The path you load is interpreted on the **server's filesystem** — this
+is a local dev tool. No auth, no persistence, no cross-tab sync.
+
 ## Scope
 
 In v1: `stages`, jobs, `needs`, `dependencies`, `when`, `allow_failure`, `rules`

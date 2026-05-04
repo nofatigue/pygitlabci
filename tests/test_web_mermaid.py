@@ -1,9 +1,8 @@
 """Mermaid renderer regression coverage."""
 from __future__ import annotations
 
-from gitlabci_sim_web.mermaid import render_dag
-
 from gitlabci_sim.model import Job, JobRun, Pipeline
+from gitlabci_sim.web.mermaid import render_dag
 
 
 def _pipeline_with_stage_and_job_sharing_a_name() -> Pipeline:

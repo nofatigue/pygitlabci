@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from gitlabci_sim_web.app import CONFIG, app
+
+from gitlabci_sim.web.app import CONFIG, app
 
 SESSION_ID_RE = re.compile(r'data-session-id="([0-9a-f]+)"')
 

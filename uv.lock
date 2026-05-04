@@ -5,12 +5,6 @@ resolution-markers = [
     "python_full_version >= '3.15'",
 ]
 
-[manifest]
-members = [
-    "gitlabci-sim",
-    "gitlabci-sim-web",
-]
-
 [[package]]
 name = "annotated-doc"
 version = "0.0.4"
@@ -90,7 +84,7 @@ wheels = [
 
 [[package]]
 name = "gitlabci-sim"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "pydantic" },
@@ -102,52 +96,35 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "httpx" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
     { name = "syrupy" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
-    { name = "pydantic", specifier = ">=2.7" },
-    { name = "pyparsing", specifier = ">=3.1" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
-    { name = "rich", specifier = ">=13.7" },
-    { name = "ruamel-yaml", specifier = ">=0.18" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
-    { name = "syrupy", marker = "extra == 'dev'", specifier = ">=4" },
-    { name = "typer", specifier = ">=0.12" },
-]
-
-[[package]]
-name = "gitlabci-sim-web"
-version = "0.1.0"
-source = { editable = "src/web" }
-dependencies = [
+web = [
     { name = "fastapi" },
-    { name = "gitlabci-sim" },
     { name = "jinja2" },
     { name = "python-multipart" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
-[package.optional-dependencies]
-dev = [
-    { name = "httpx" },
-    { name = "pytest" },
-]
-
 [package.metadata]
 requires-dist = [
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "gitlabci-sim", editable = "." },
+    { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.115" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
-    { name = "jinja2", specifier = ">=3.1" },
+    { name = "jinja2", marker = "extra == 'web'", specifier = ">=3.1" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
+    { name = "pydantic", specifier = ">=2.7" },
+    { name = "pyparsing", specifier = ">=3.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
-    { name = "python-multipart", specifier = ">=0.0.9" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
+    { name = "python-multipart", marker = "extra == 'web'", specifier = ">=0.0.9" },
+    { name = "rich", specifier = ">=13.7" },
+    { name = "ruamel-yaml", specifier = ">=0.18" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
+    { name = "syrupy", marker = "extra == 'dev'", specifier = ">=4" },
+    { name = "typer", specifier = ">=0.12" },
+    { name = "uvicorn", extras = ["standard"], marker = "extra == 'web'", specifier = ">=0.30" },
 ]
 
 [[package]]
