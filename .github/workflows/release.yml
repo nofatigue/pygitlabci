@@ -1,0 +1,48 @@
+name: release
+
+# Triggers when you push a version tag, e.g.:
+#   git tag -a v0.2.0 -m "Release v0.2.0"
+#   git push origin v0.2.0
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # required to create the GitHub Release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify pyproject version matches the tag
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          ver=$(grep '^version' pyproject.toml | head -1 | sed -E 's/version *= *"(.+)"/\1/')
+          if [ "$tag" != "$ver" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match pyproject version $ver"
+            exit 1
+          fi
+
+      - name: Build wheel + sdist
+        run: uv build
+
+      - name: Run tests against the wheel
+        run: |
+          uv sync --extra dev --extra web
+          uv run pytest
+
+      - name: Create GitHub Release with artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            dist/*.whl dist/*.tar.gz
