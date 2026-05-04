@@ -6,6 +6,8 @@ Pipeline shape under test:
         → test_<item>          (20, only first 20 items)
         → deploy_<item>        (50, when: manual, need their build)
 """
+# Single source of truth — must match examples/furniture/generate.py.
+import sys
 from pathlib import Path
 
 import pytest
@@ -16,8 +18,6 @@ from gitlabci_sim.loader import resolve_references
 from gitlabci_sim.simulator import apply, initial_state
 from gitlabci_sim.variables import Context
 
-# Single source of truth — must match examples/furniture/generate.py.
-import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "examples" / "furniture"))
 from generate import FURNITURE, TESTED  # noqa: E402
 

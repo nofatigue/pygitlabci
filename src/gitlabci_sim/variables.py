@@ -21,13 +21,20 @@ class Context:
     commit_sha: str = "0" * 40
     changed_files: list[str] = field(default_factory=list)
     extra: dict[str, str] = field(default_factory=dict)
+    # MR fields — only emitted as CI_MERGE_REQUEST_* when pipeline_source is
+    # "merge_request_event". Defaults are filled in to give configs that read
+    # `$CI_MERGE_REQUEST_TARGET_BRANCH_NAME` something sensible to compare.
+    mr_iid: int | None = None
+    mr_source_branch: str | None = None
+    mr_target_branch: str | None = None
+    mr_title: str | None = None
+    mr_labels: list[str] = field(default_factory=list)
 
     def predefined(self) -> dict[str, str]:
-        return {
+        env: dict[str, str] = {
             "CI": "true",
             "GITLAB_CI": "true",
             "CI_COMMIT_REF_NAME": self.ref,
-            "CI_COMMIT_BRANCH": self.ref,
             "CI_COMMIT_SHA": self.commit_sha,
             "CI_COMMIT_SHORT_SHA": self.commit_sha[:8],
             "CI_PIPELINE_SOURCE": self.pipeline_source,
@@ -35,6 +42,21 @@ class Context:
             "CI_PROJECT_NAME": self.project_path.rsplit("/", 1)[-1],
             "CI_DEFAULT_BRANCH": "main",
         }
+        if self.pipeline_source == "merge_request_event":
+            # Real GitLab MR pipelines run on the merge result, not on a branch,
+            # so CI_COMMIT_BRANCH is intentionally absent.
+            env["CI_MERGE_REQUEST_IID"] = str(self.mr_iid) if self.mr_iid is not None else "1"
+            env["CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"] = self.mr_source_branch or self.ref
+            env["CI_MERGE_REQUEST_TARGET_BRANCH_NAME"] = self.mr_target_branch or "main"
+            if self.mr_title is not None:
+                env["CI_MERGE_REQUEST_TITLE"] = self.mr_title
+            env["CI_MERGE_REQUEST_LABELS"] = ",".join(self.mr_labels)
+        elif self.pipeline_source == "tag":
+            # Tag pipelines: CI_COMMIT_TAG is set, CI_COMMIT_BRANCH is not.
+            env["CI_COMMIT_TAG"] = self.ref
+        else:
+            env["CI_COMMIT_BRANCH"] = self.ref
+        return env
 
 
 def expand(value: Any, env: dict[str, str]) -> Any:
