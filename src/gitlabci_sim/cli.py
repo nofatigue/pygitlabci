@@ -196,6 +196,51 @@ def _parse_child_yaml(values: list[str] | None) -> dict[str, Path]:
     return out
 
 
+def _run_with_context(
+    target: Path,
+    ctx: Context,
+    results: str | None,
+    state_in: Path | None,
+    state_out: Path | None,
+    child_yaml: list[str] | None,
+) -> None:
+    pipeline, _ = _build_pipeline(target, ctx)
+
+    if state_in:
+        state = PipelineState.model_validate_json(state_in.read_text())
+    else:
+        state = initial_state(pipeline)
+        root_dir = _find_root(target).parent
+        state = attach_static_child_pipelines(state, root_dir, ctx)
+
+    child_map = _parse_child_yaml(child_yaml)
+
+    def _on_success_attach(parent: str, st: PipelineState) -> PipelineState:
+        if parent not in child_map:
+            return st
+        child = load_child_pipeline_from_yaml(child_map[parent], ctx)
+        return attach_child_pipeline(st, parent, child)
+
+    if results is not None:
+        if results == "-":
+            payload = json.load(sys.stdin)
+        else:
+            payload = json.loads(Path(results).read_text())
+        for parent, status in payload.items():
+            if status == "success" and parent in child_map:
+                child = load_child_pipeline_from_yaml(child_map[parent], ctx)
+                state = attach_child_pipeline(state, parent, child)
+        state = sim_apply(state, payload)
+        if state_out:
+            state_out.write_text(state.model_dump_json(indent=2))
+        console.print_json(state.model_dump_json())
+        return
+
+    state = run_session(state, console=console, on_child_pipeline=_on_success_attach)
+    if state_out:
+        state_out.write_text(state.model_dump_json(indent=2))
+
+
 @app.command()
 def run(
     target: Path = typer.Argument(..., help="Folder containing .gitlab-ci.yml, or a YAML file"),
@@ -223,43 +268,63 @@ def run(
         changed_files=list(changed or []),
         extra=_parse_var_list(var),
     )
-    pipeline, source = _build_pipeline(target, ctx)
+    _run_with_context(target, ctx, results, state_in, state_out, child_yaml)
 
-    if state_in:
-        state = PipelineState.model_validate_json(state_in.read_text())
-    else:
-        state = initial_state(pipeline)
-        # Eagerly attach static child pipelines (trigger:include:local).
-        root_dir = _find_root(target).parent
-        state = attach_static_child_pipelines(state, root_dir, ctx)
 
-    child_map = _parse_child_yaml(child_yaml)
-
-    def _on_success_attach(parent: str, st: PipelineState) -> PipelineState:
-        if parent not in child_map:
-            return st
-        child = load_child_pipeline_from_yaml(child_map[parent], ctx)
-        return attach_child_pipeline(st, parent, child)
-
-    if results is not None:
-        if results == "-":
-            payload = json.load(sys.stdin)
-        else:
-            payload = json.loads(Path(results).read_text())
-        # First attach any child YAMLs whose parent we're about to mark success.
-        for parent, status in payload.items():
-            if status == "success" and parent in child_map:
-                child = load_child_pipeline_from_yaml(child_map[parent], ctx)
-                state = attach_child_pipeline(state, parent, child)
-        state = sim_apply(state, payload)
-        if state_out:
-            state_out.write_text(state.model_dump_json(indent=2))
-        console.print_json(state.model_dump_json())
-        return
-
-    state = run_session(state, console=console, on_child_pipeline=_on_success_attach)
-    if state_out:
-        state_out.write_text(state.model_dump_json(indent=2))
+@app.command()
+def mr(
+    target: Path = typer.Argument(..., help="Folder containing .gitlab-ci.yml, or a YAML file"),
+    source_branch: str = typer.Option(
+        "feature/x",
+        "--source-branch",
+        help="MR source branch (becomes CI_MERGE_REQUEST_SOURCE_BRANCH_NAME and CI_COMMIT_REF_NAME)",
+    ),
+    target_branch: str = typer.Option(
+        "main",
+        "--target-branch",
+        help="MR target branch (CI_MERGE_REQUEST_TARGET_BRANCH_NAME)",
+    ),
+    mr_iid: int = typer.Option(1, "--mr-iid", help="MR IID (CI_MERGE_REQUEST_IID)"),
+    title: str | None = typer.Option(
+        None, "--title", help="MR title (CI_MERGE_REQUEST_TITLE)"
+    ),
+    label: list[str] | None = typer.Option(
+        None,
+        "--label",
+        help="MR label; repeat for multiple (joined into CI_MERGE_REQUEST_LABELS)",
+    ),
+    changed: list[str] | None = typer.Option(
+        None,
+        "--changed",
+        help="File path changed in the MR; repeat for multiple. Drives rules:changes:.",
+    ),
+    var: list[str] | None = typer.Option(None, "--var"),
+    results: str | None = typer.Option(
+        None,
+        "--results",
+        help="Path to JSON {job: status}, or '-' for stdin. Scriptable mode.",
+    ),
+    state_in: Path | None = typer.Option(None, "--state-in", help="Resume from saved state JSON"),
+    state_out: Path | None = typer.Option(None, "--state-out", help="Write final state JSON"),
+    child_yaml: list[str] | None = typer.Option(
+        None,
+        "--child-yaml",
+        help="JOB=PATH; YAML to attach when JOB (a trigger:include:artifact job) succeeds",
+    ),
+) -> None:
+    """Simulate an MR pipeline: pipeline_source=merge_request_event, MR predefined vars set."""
+    ctx = Context(
+        ref=source_branch,
+        pipeline_source="merge_request_event",
+        changed_files=list(changed or []),
+        extra=_parse_var_list(var),
+        mr_iid=mr_iid,
+        mr_source_branch=source_branch,
+        mr_target_branch=target_branch,
+        mr_title=title,
+        mr_labels=list(label or []),
+    )
+    _run_with_context(target, ctx, results, state_in, state_out, child_yaml)
 
 
 if __name__ == "__main__":
