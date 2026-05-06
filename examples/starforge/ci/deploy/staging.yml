@@ -1,0 +1,17 @@
+verify:staging:
+  stage: verify
+  extends: .python_setup
+  needs:
+    - deploy:api:staging
+    - deploy:web:staging
+  script:
+    - pytest -q tests/smoke --base-url=https://staging.example.com
+
+# No `extends:` — picks up image, before_script, retry, interruptible, and tags
+# from the merged `default:` block.
+notify:staging:
+  stage: verify
+  needs:
+    - verify:staging
+  script:
+    - 'curl -X POST "$SLACK_WEBHOOK" -d ''{"text":"staging ok"}'''

@@ -1,0 +1,22 @@
+build:api:
+  stage: build
+  extends: .docker_build
+  needs:
+    - test:unit
+  script:
+    - docker build -t "$CI_REGISTRY/api:$CI_COMMIT_SHA" services/api
+    - docker push "$CI_REGISTRY/api:$CI_COMMIT_SHA"
+
+# Two-parent extends: .docker_build wins for `image`/`services`/`before_script`
+# (last parent in the list takes precedence).
+build:web:
+  stage: build
+  extends:
+    - .node_setup
+    - .docker_build
+  needs:
+    - lint:js
+  script:
+    - npm run build
+    - docker build -t "$CI_REGISTRY/web:$CI_COMMIT_SHA" services/web
+    - docker push "$CI_REGISTRY/web:$CI_COMMIT_SHA"

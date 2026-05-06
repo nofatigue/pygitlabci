@@ -13,7 +13,7 @@ from copy import deepcopy
 from typing import Any
 
 from .extends import is_job_key, resolve_all_extends
-from .model import Job, Need, Pipeline, Trigger
+from .model import Job, Need, Pipeline, RuleEvaluation, Trigger
 from .rules import apply_rules
 from .variables import Context, expand, merge_env
 
@@ -47,9 +47,10 @@ def compile_pipeline(
     default_block = cfg.get("default", {}) or {}
     global_vars = _to_str_dict(cfg.get("variables", {}))
 
-    # Apply default + extends to every job.
-    cfg = _apply_default(cfg, default_block)
+    # Resolve extends first, then fill in missing keys from default. Per GitLab docs,
+    # default does not override anything the job (or its extends parents) already defines.
     cfg = resolve_all_extends(cfg)
+    cfg = _apply_default(cfg, default_block)
 
     raw_jobs = {k: v for k, v in cfg.items() if is_job_key(k, v) and not k.startswith(".")}
 
@@ -57,17 +58,47 @@ def compile_pipeline(
     base_env = merge_env(ctx.predefined(), ctx.extra, global_vars)
 
     jobs: dict[str, Job] = {}
+    not_triggered: dict[str, Job] = {}
     for name, raw in raw_jobs.items():
         job_vars = _to_str_dict(raw.get("variables", {}))
         env = merge_env(base_env, job_vars)
 
         # Rules are evaluated against the *unexpanded* config (the parser handles $VAR).
         rule_outcome = apply_rules(raw, ctx, env)
-        if rule_outcome.dropped:
-            continue
+        evaluations = [
+            RuleEvaluation(
+                index=ev.index, rule=ev.rule, matched=ev.matched,
+                reason=ev.reason, when=ev.when,
+            )
+            for ev in rule_outcome.evaluations
+        ]
 
         # Pre-expand everything except `rules`/`only`/`except` (already consumed).
         expanded = {k: expand(v, env) for k, v in raw.items() if k not in {"rules", "only", "except"}}
+
+        if rule_outcome.dropped:
+            # Build a stub Job so the dimmed DAG / not-triggered view can show it.
+            # We keep stage/needs/trigger metadata; the simulator never sees this dict.
+            not_triggered[name] = Job(
+                name=name,
+                stage=str(expanded.get("stage", "test")),
+                script=_as_str_list(expanded.get("script", [])),
+                before_script=_as_str_list(expanded.get("before_script", [])),
+                after_script=_as_str_list(expanded.get("after_script", [])),
+                needs=_parse_needs(expanded.get("needs")),
+                dependencies=_as_str_list(expanded.get("dependencies", [])),
+                when="never",
+                allow_failure=False,
+                variables=job_vars,
+                rules_matched=rule_outcome.matched_rule,
+                rules_evaluation=evaluations,
+                matched_rule_index=rule_outcome.matched_index,
+                trigger=_parse_trigger(expanded.get("trigger")),
+                extends_chain=expanded.get("_extends_chain", []),
+                triggered=False,
+                not_triggered_reason=rule_outcome.drop_reason,
+            )
+            continue
 
         when = rule_outcome.when or expanded.get("when") or "on_success"
         allow_failure = bool(
@@ -88,8 +119,11 @@ def compile_pipeline(
             allow_failure=allow_failure,
             variables=merge_env(job_vars, rule_outcome.extra_variables or {}),
             rules_matched=rule_outcome.matched_rule,
+            rules_evaluation=evaluations,
+            matched_rule_index=rule_outcome.matched_index,
             trigger=_parse_trigger(expanded.get("trigger")),
             extends_chain=expanded.get("_extends_chain", []),
+            triggered=True,
         )
         jobs[name] = job
 
@@ -104,6 +138,7 @@ def compile_pipeline(
         source_files=source_files or [],
         workflow_when=workflow_when,
         global_variables=global_vars,
+        not_triggered=not_triggered,
     )
 
 
@@ -135,9 +170,11 @@ def _resolve_workflow(cfg: dict[str, Any], ctx: Context) -> str:
     return outcome.when or "on_success"
 
 
+# Full set of `default:` keys per GitLab CI docs. Job-level keys are NOT merged with
+# default — if a job already defines the key, the default is ignored.
 _DEFAULT_KEYS = {
-    "image", "services", "before_script", "after_script", "cache",
-    "tags", "timeout", "retry", "interruptible", "artifacts",
+    "after_script", "artifacts", "before_script", "cache", "hooks",
+    "id_tokens", "image", "interruptible", "retry", "services", "tags",
 }
 
 
@@ -146,6 +183,10 @@ def _apply_default(cfg: dict[str, Any], default: dict[str, Any]) -> dict[str, An
         return cfg
     for name, value in list(cfg.items()):
         if not is_job_key(name, value):
+            continue
+        # Hidden template jobs (.foo) don't get default — only real jobs do, and they
+        # would have already inherited template values via extends at this point.
+        if name.startswith("."):
             continue
         for k, v in default.items():
             if k in _DEFAULT_KEYS and k not in value:

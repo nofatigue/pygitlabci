@@ -1,0 +1,22 @@
+test:unit:
+  stage: test
+  extends: .python_setup
+  needs:
+    - lint:python
+  script:
+    - pytest -q tests/unit
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+
+test:integration:
+  stage: test
+  extends: .python_setup
+  needs:
+    - lint:python
+  script:
+    - pytest -q tests/integration
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'

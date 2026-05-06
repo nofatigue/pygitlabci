@@ -14,6 +14,7 @@ from .child_pipeline import (
     load_child_pipeline_from_yaml,
 )
 from .compiler import compile_pipeline
+from .explain import print_rule_trace
 from .includes import resolve_includes
 from .interactive import run_session
 from .loader import resolve_references
@@ -87,6 +88,16 @@ def plan(
     var: list[str] | None = typer.Option(None, "--var", help="KEY=VALUE; repeat for multiple"),
     changed: list[str] | None = typer.Option(None, "--changed", help="Changed file (repeat)"),
     fmt: str = typer.Option("json", "--format", help="json or table"),
+    show_not_triggered: bool = typer.Option(
+        False,
+        "--show-not-triggered",
+        help="Include jobs whose rules dropped them in the output (hidden by default).",
+    ),
+    explain: str | None = typer.Option(
+        None,
+        "--explain",
+        help="Show the rule-by-rule trace for one job (use 'all' to dump every job).",
+    ),
 ) -> None:
     """Compile the pipeline and print the canonical Pipeline JSON (or a table)."""
     root = _find_root(target)
@@ -102,33 +113,74 @@ def plan(
         extra=_parse_var_list(var),
     )
     pipeline = compile_pipeline(merged, ctx, source_files=result.source_files)
+    if explain is not None:
+        _print_explanation(pipeline, explain)
+        return
     if fmt == "table":
-        _print_pipeline_table(pipeline)
+        _print_pipeline_table(pipeline, show_not_triggered=show_not_triggered)
     elif fmt == "json":
-        console.print_json(pipeline.model_dump_json())
+        if not show_not_triggered:
+            redacted = pipeline.model_copy(update={"not_triggered": {}})
+            console.print_json(redacted.model_dump_json())
+        else:
+            console.print_json(pipeline.model_dump_json())
     else:
         raise typer.BadParameter(f"--format must be json or table, got {fmt!r}")
 
 
-def _print_pipeline_table(pipeline) -> None:
+def _print_pipeline_table(pipeline, show_not_triggered: bool = False) -> None:
     from rich.table import Table
 
-    table = Table(title=f"pipeline ({len(pipeline.jobs)} jobs)")
+    n_triggered = len(pipeline.jobs)
+    n_skipped = len(pipeline.not_triggered)
+    title = f"pipeline ({n_triggered} jobs"
+    if show_not_triggered and n_skipped:
+        title += f", {n_skipped} not-triggered"
+    title += ")"
+    table = Table(title=title)
     table.add_column("stage")
     table.add_column("job")
     table.add_column("when", style="dim")
     table.add_column("needs")
     table.add_column("trigger", style="cyan")
+    if show_not_triggered:
+        table.add_column("triggered", style="yellow")
 
     rows = []
-    for name, job in pipeline.jobs.items():
-        needs = ", ".join(n.job for n in job.needs) or "-"
-        trig = job.trigger.kind if job.trigger else ""
-        rows.append((job.stage, name, job.when, needs, trig))
-    rows.sort(key=lambda r: (pipeline.stages.index(r[0]), r[1]))
+    sources = [(pipeline.jobs.values(), True)]
+    if show_not_triggered:
+        sources.append((pipeline.not_triggered.values(), False))
+    for source, triggered in sources:
+        for job in source:
+            needs = ", ".join(n.job for n in job.needs) or "-"
+            trig = job.trigger.kind if job.trigger else ""
+            row = [job.stage, job.name, job.when, needs, trig]
+            if show_not_triggered:
+                row.append("yes" if triggered else "[red]no[/]")
+            rows.append(row)
+    rows.sort(key=lambda r: (pipeline.stages.index(r[0]) if r[0] in pipeline.stages else 99, r[1]))
     for r in rows:
         table.add_row(*r)
     console.print(table)
+    if show_not_triggered and n_skipped:
+        console.print(
+            f"[dim]({n_skipped} job(s) not triggered — see 'sim plan ... --explain <job>' "
+            f"to view rule trace)[/]"
+        )
+
+
+def _print_explanation(pipeline, target_name: str) -> None:
+    """Dump rule-by-rule evaluation for a single job (or every job when 'all')."""
+    if target_name == "all":
+        targets = list(pipeline.jobs.values()) + list(pipeline.not_triggered.values())
+    else:
+        job = pipeline.jobs.get(target_name) or pipeline.not_triggered.get(target_name)
+        if job is None:
+            _die(f"no such job: {target_name!r}")
+        targets = [job]
+
+    for job in targets:
+        print_rule_trace(job, console)
 
 
 def _to_mermaid(pipeline) -> str:
@@ -266,6 +318,37 @@ def run(
         ref=ref,
         pipeline_source=pipeline_source,
         changed_files=list(changed or []),
+        extra=_parse_var_list(var),
+    )
+    _run_with_context(target, ctx, results, state_in, state_out, child_yaml)
+
+
+@app.command()
+def tag(
+    target: Path = typer.Argument(..., help="Folder containing .gitlab-ci.yml, or a YAML file"),
+    tag_name: str = typer.Option(
+        ...,
+        "--tag",
+        help="Tag name (becomes CI_COMMIT_TAG and CI_COMMIT_REF_NAME).",
+    ),
+    var: list[str] | None = typer.Option(None, "--var"),
+    results: str | None = typer.Option(
+        None,
+        "--results",
+        help="Path to JSON {job: status}, or '-' for stdin. Scriptable mode.",
+    ),
+    state_in: Path | None = typer.Option(None, "--state-in", help="Resume from saved state JSON"),
+    state_out: Path | None = typer.Option(None, "--state-out", help="Write final state JSON"),
+    child_yaml: list[str] | None = typer.Option(
+        None,
+        "--child-yaml",
+        help="JOB=PATH; YAML to attach when JOB (a trigger:include:artifact job) succeeds",
+    ),
+) -> None:
+    """Simulate a tag-release pipeline: pipeline_source=tag, CI_COMMIT_TAG set."""
+    ctx = Context(
+        ref=tag_name,
+        pipeline_source="tag",
         extra=_parse_var_list(var),
     )
     _run_with_context(target, ctx, results, state_in, state_out, child_yaml)

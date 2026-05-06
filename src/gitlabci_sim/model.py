@@ -1,7 +1,7 @@
 """Canonical pydantic models — the JSON contract for parsed/compiled pipelines."""
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -43,6 +43,17 @@ class Trigger(BaseModel):
     strategy: Literal["depend", "mirror"] | None = None
 
 
+class RuleEvaluation(BaseModel):
+    """Per-rule trace: did this rule (at this index in the job's `rules:` list) match,
+    and what was the deciding clause?"""
+    model_config = ConfigDict(extra="forbid")
+    index: int
+    rule: dict[str, Any] = Field(default_factory=dict)
+    matched: bool
+    reason: str  # human-readable: "if false ($REF=feature)", "changes matched src/x.py", ...
+    when: str | None = None  # the `when:` this rule would have produced if matched
+
+
 class Job(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
@@ -55,10 +66,14 @@ class Job(BaseModel):
     when: WhenValue = "on_success"
     allow_failure: bool = False
     variables: dict[str, str] = Field(default_factory=dict)
-    rules_matched: dict | None = None
+    rules_matched: dict[str, Any] | None = None
+    rules_evaluation: list[RuleEvaluation] = Field(default_factory=list)
+    matched_rule_index: int | None = None
     trigger: Trigger | None = None
     extends_chain: list[str] = Field(default_factory=list)
     source_file: str | None = None
+    triggered: bool = True
+    not_triggered_reason: str | None = None
 
 
 class Pipeline(BaseModel):
@@ -69,6 +84,9 @@ class Pipeline(BaseModel):
     source_files: list[str] = Field(default_factory=list)
     workflow_when: WhenValue = "on_success"
     global_variables: dict[str, str] = Field(default_factory=dict)
+    # Jobs whose rules dropped them — kept for visibility in `--show-not-triggered`
+    # and the dimmed DAG. Not part of the simulator's run set.
+    not_triggered: dict[str, Job] = Field(default_factory=dict)
 
 
 class JobRun(BaseModel):

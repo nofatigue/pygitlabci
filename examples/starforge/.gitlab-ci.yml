@@ -1,0 +1,41 @@
+# Imaginary multi-service deploy pipeline for "starforge".
+#
+# Demonstrates:
+#   - Glob includes (ci/defaults/*.yml, ci/templates/*.yml, ...).
+#   - `default:` split across multiple included files and merged with the entry's own
+#     default (this file's `default:` wins per-key).
+#   - `extends:` chains, including a job that extends two parents.
+#   - `needs:` building a DAG that fans out across services.
+#   - Workflow rules and per-job rules (manual production gates).
+include:
+  - local: ci/defaults/*.yml
+  - local: ci/templates/*.yml
+  - local: ci/stages/*.yml
+  - local: ci/services/*.yml
+  - local: ci/deploy/staging.yml
+  - local: ci/deploy/production.yml
+
+stages:
+  - lint
+  - test
+  - build
+  - deploy:staging
+  - deploy:production
+  - verify
+
+variables:
+  PROJECT_NAME: starforge
+
+# Merges with the `default:` blocks contributed by ci/defaults/*.yml.
+# `tags` is added; `retry` overrides the value from base.yml.
+default:
+  tags:
+    - kubernetes
+    - linux
+  retry: 1
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_TAG'

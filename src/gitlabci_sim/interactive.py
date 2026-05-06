@@ -7,6 +7,8 @@ Commands:
     cancel <name>      mark job canceled
     state              re-print current state
     show <name>        show full job details
+    explain <name>     show the rule-by-rule trace for a job (alias: why)
+    not-triggered      list jobs whose rules dropped them (alias: nt)
     save <path>        write current state to file
     quit / exit / q    leave the session
     help / ?           command list
@@ -23,6 +25,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from .explain import print_rule_trace
 from .model import JobStatus, PipelineState
 from .simulator import apply
 
@@ -72,6 +75,12 @@ def run_session(
             continue
         if cmd == "show":
             _show_job(state, rest, console)
+            continue
+        if cmd in {"explain", "why"}:
+            _explain_job(state, rest, console)
+            continue
+        if cmd in {"not-triggered", "nt"}:
+            _list_not_triggered(state, console)
             continue
         if cmd == "save":
             if not rest:
@@ -157,11 +166,44 @@ def _resolve_target(state: PipelineState, rest: str) -> str | None:
 
 
 def _show_job(state: PipelineState, name: str, console: Console) -> None:
-    if name not in state.pipeline.jobs:
+    job = state.pipeline.jobs.get(name) or state.pipeline.not_triggered.get(name)
+    if job is None:
         console.print(f"[red]no such job: {name!r}[/]")
         return
-    job = state.pipeline.jobs[name]
     console.print_json(job.model_dump_json())
+
+
+def _explain_job(state: PipelineState, name: str, console: Console) -> None:
+    if not name:
+        console.print("[red]usage: explain <job-name>[/]")
+        return
+    job = state.pipeline.jobs.get(name) or state.pipeline.not_triggered.get(name)
+    if job is None:
+        console.print(f"[red]no such job: {name!r}[/]")
+        return
+    print_rule_trace(job, console)
+
+
+def _list_not_triggered(state: PipelineState, console: Console) -> None:
+    nt = state.pipeline.not_triggered
+    if not nt:
+        console.print("[dim]no not-triggered jobs in this pipeline[/]")
+        return
+    table = Table(title=f"not-triggered ({len(nt)})", show_lines=False)
+    table.add_column("name")
+    table.add_column("stage")
+    table.add_column("reason", style="dim")
+    rows = sorted(
+        nt.values(),
+        key=lambda j: (
+            state.pipeline.stages.index(j.stage) if j.stage in state.pipeline.stages else 99,
+            j.name,
+        ),
+    )
+    for job in rows:
+        table.add_row(job.name, job.stage, job.not_triggered_reason or "—")
+    console.print(table)
+    console.print("[dim](use 'explain <name>' to see the per-rule trace)[/]")
 
 
 def _print_help(console: Console) -> None:
@@ -173,7 +215,9 @@ def _print_help(console: Console) -> None:
             "  skip <name|#>     mark skipped\n"
             "  cancel <name|#>   mark canceled\n"
             "  state             redraw the table\n"
-            "  show <name>       full job details\n"
+            "  show <name>       full job details (JSON)\n"
+            "  explain <name>    rule-by-rule trace (alias: why)\n"
+            "  not-triggered     list rule-dropped jobs (alias: nt)\n"
             "  save <path>       write current state JSON\n"
             "  help              this help\n"
             "  quit              leave (state lost unless saved)",

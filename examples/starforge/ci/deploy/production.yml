@@ -1,0 +1,11 @@
+verify:production:
+  stage: verify
+  extends: .python_setup
+  needs:
+    - deploy:api:prod
+    - deploy:web:prod
+  script:
+    - pytest -q tests/smoke --base-url=https://example.com
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual

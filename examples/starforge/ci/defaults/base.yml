@@ -1,0 +1,5 @@
+# Half of the global `default:` block — image and retry policy.
+default:
+  image: registry.example.com/builders/ubuntu:22.04
+  retry: 2
+  interruptible: true

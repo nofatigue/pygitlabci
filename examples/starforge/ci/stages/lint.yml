@@ -1,0 +1,12 @@
+lint:python:
+  stage: lint
+  extends: .python_setup
+  script:
+    - ruff check src tests
+    - mypy src
+
+lint:js:
+  stage: lint
+  extends: .node_setup
+  script:
+    - npm run lint

@@ -1,0 +1,24 @@
+deploy:web:staging:
+  stage: deploy:staging
+  extends: .deploy_template
+  needs:
+    - build:web
+  script:
+    - kubectl set image deployment/web web="$CI_REGISTRY/web:$CI_COMMIT_SHA" -n staging
+  environment:
+    name: staging-web
+    url: https://staging.example.com
+
+deploy:web:prod:
+  stage: deploy:production
+  extends: .deploy_template
+  needs:
+    - deploy:web:staging
+  script:
+    - kubectl set image deployment/web web="$CI_REGISTRY/web:$CI_COMMIT_SHA" -n production
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  environment:
+    name: production-web
+    url: https://example.com

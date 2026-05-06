@@ -1,0 +1,8 @@
+.node_setup:
+  image: node:20-alpine
+  before_script:
+    - npm ci --cache .cache/npm
+  cache:
+    key: npm-$CI_COMMIT_REF_SLUG
+    paths:
+      - .cache/npm

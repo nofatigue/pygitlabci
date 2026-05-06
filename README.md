@@ -35,6 +35,25 @@ uv run sim plan examples/with_includes --ref feature/x # different rules outcome
 
 `--var KEY=VAL` to override variables; `--changed path/to/file.py` for `rules:changes:`.
 
+Jobs whose `rules:` dropped them are hidden by default. Two ways to inspect them:
+
+```sh
+uv run sim plan examples/with_includes --ref feature/x --format table --show-not-triggered
+uv run sim plan examples/with_includes --ref feature/x --explain deploy_app
+uv run sim plan examples/with_includes --ref feature/x --explain all
+```
+
+`--explain <job>` prints the rule-by-rule trace (matched/no-match + reason) for one
+job; `--explain all` dumps it for every job in the pipeline.
+
+### Offline `template:` includes
+
+`include: - template: Foo/Bar.gitlab-ci.yml` resolves against
+`<project_root>/templates/Foo/Bar.gitlab-ci.yml` — no network access. To wire up a
+GitLab-shipped template (e.g. `Security/SAST.gitlab-ci.yml`), fetch it once and commit
+it under `templates/` next to your `.gitlab-ci.yml`. See
+`examples/wireshark__wireshark/templates/` for a worked example.
+
 ### Step through a pipeline
 
 ```sh
@@ -43,6 +62,16 @@ uv run sim run examples/needs_dag
 
 Interactive table of ready jobs. Type `pass 1` (or `pass <name>`), `fail 1`, `skip 1`,
 `state`, `show <name>`, `save out.json`, `quit`.
+
+### Simulate a tag release
+
+```sh
+uv run sim tag examples/with_includes --tag v1.2.3
+```
+
+Sets `CI_PIPELINE_SOURCE=tag` and `CI_COMMIT_TAG=v1.2.3` (and `CI_COMMIT_REF_NAME`).
+`CI_COMMIT_BRANCH` is omitted, matching real tag pipelines. Same scriptable
+`--results`, `--state-in/out`, `--child-yaml` flags as `run`.
 
 ### Simulate an MR with given changes
 

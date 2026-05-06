@@ -173,6 +173,22 @@ table.jobs td.dim { color: var(--muted); }
 .status-pill.status-manual   { background: #fff4c5; color: #6b5300; }
 .status-pill.status-skipped  { background: #eee; color: #555; }
 
+details.not-triggered-dag,
+details.not-triggered-list {
+  margin: 0.5rem 0 1rem 0;
+}
+details.not-triggered-dag > summary,
+details.not-triggered-list > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 0.25rem 0;
+}
+tr.status-not_triggered td {
+  color: #888;
+  font-style: italic;
+}
+
 section.stage {
   margin: 1.25rem 0;
 }

@@ -1,0 +1,6 @@
+# Other half of the global `default:` block — runs on every job that doesn't
+# already define before_script (directly or via extends).
+default:
+  before_script:
+    - 'echo "[ci] $PROJECT_NAME starting on $CI_RUNNER_DESCRIPTION"'
+    - mkdir -p .cache

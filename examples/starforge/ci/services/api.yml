@@ -1,0 +1,24 @@
+deploy:api:staging:
+  stage: deploy:staging
+  extends: .deploy_template
+  needs:
+    - build:api
+  script:
+    - kubectl set image deployment/api api="$CI_REGISTRY/api:$CI_COMMIT_SHA" -n staging
+  environment:
+    name: staging-api
+    url: https://api.staging.example.com
+
+deploy:api:prod:
+  stage: deploy:production
+  extends: .deploy_template
+  needs:
+    - deploy:api:staging
+  script:
+    - kubectl set image deployment/api api="$CI_REGISTRY/api:$CI_COMMIT_SHA" -n production
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  environment:
+    name: production-api
+    url: https://api.example.com

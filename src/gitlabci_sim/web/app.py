@@ -70,14 +70,25 @@ def _panel(request: Request, session: Session) -> HTMLResponse:
         stage: sum(1 for job in jobs if job.name in ready)
         for stage, jobs in by_stage.items()
     }
+    not_triggered = list(session.pipeline.not_triggered.values())
+    not_triggered.sort(
+        key=lambda j: (
+            session.pipeline.stages.index(j.stage) if j.stage in session.pipeline.stages else 99,
+            j.name,
+        ),
+    )
     return templates.TemplateResponse(
         request,
         "_pipeline.html",
         {
             "session": session,
             "mermaid_source": render_dag(session.pipeline, session.state.runs),
+            "mermaid_full_source": render_dag(
+                session.pipeline, session.state.runs, include_not_triggered=True,
+            ),
             "jobs_by_stage": by_stage,
             "ready_by_stage": ready_by_stage,
+            "not_triggered_jobs": not_triggered,
         },
     )
 

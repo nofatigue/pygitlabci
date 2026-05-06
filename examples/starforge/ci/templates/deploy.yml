@@ -1,0 +1,5 @@
+.deploy_template:
+  image: alpine/k8s:1.28.4
+  before_script:
+    - kubectl config use-context "$KUBE_CONTEXT"
+  retry: 1

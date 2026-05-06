@@ -30,6 +30,34 @@
     <pre class="mermaid" data-source="{{ mermaid_source }}">{{ mermaid_source }}</pre>
   </div>
 
+  {% if not_triggered_jobs %}
+    <details class="not-triggered-dag">
+      <summary>Show full DAG (with {{ not_triggered_jobs | length }} not-triggered job{{ '' if not_triggered_jobs|length == 1 else 's' }} dimmed)</summary>
+      <div class="dag-wrap">
+        <pre class="mermaid" data-source="{{ mermaid_full_source }}">{{ mermaid_full_source }}</pre>
+      </div>
+    </details>
+
+    <details class="not-triggered-list">
+      <summary>Not-triggered jobs ({{ not_triggered_jobs | length }})</summary>
+      <table class="jobs">
+        <thead>
+          <tr><th>job</th><th>stage</th><th>reason</th><th>matched rule #</th></tr>
+        </thead>
+        <tbody>
+          {% for job in not_triggered_jobs %}
+            <tr class="status-not_triggered">
+              <td><code>{{ job.name }}</code></td>
+              <td class="dim">{{ job.stage }}</td>
+              <td class="dim">{{ job.not_triggered_reason or "—" }}</td>
+              <td class="dim">{% if job.matched_rule_index is not none %}{{ job.matched_rule_index }}{% else %}—{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+  {% endif %}
+
   <h2>Jobs</h2>
   {% for stage in session.pipeline.stages %}
     {% set jobs = jobs_by_stage.get(stage, []) %}

@@ -2,16 +2,30 @@
 
 `apply_rules(job_dict, ctx, env)` returns a `RuleOutcome` saying whether the job is dropped,
 which `when` to use, and any `variables` / `allow_failure` injected by the matched rule.
+
+The outcome also carries `evaluations`: a per-rule trace with a human-readable reason
+for each rule's match/no-match decision. Surfaced on `Job.rules_evaluation` so users
+can ask "why did this job (not) trigger?" via `sim plan --explain`.
 """
 from __future__ import annotations
 
 import fnmatch
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from .variables import Context, expand
+
+
+@dataclass
+class _RuleTrace:
+    """Internal: one entry in the per-rule evaluation list."""
+    index: int
+    rule: dict[str, Any]
+    matched: bool
+    reason: str
+    when: str | None = None
 
 
 @dataclass
@@ -21,6 +35,9 @@ class RuleOutcome:
     allow_failure: bool | None = None
     extra_variables: dict[str, str] | None = None
     matched_rule: dict | None = None
+    matched_index: int | None = None
+    evaluations: list[_RuleTrace] = field(default_factory=list)
+    drop_reason: str | None = None
 
 
 def apply_rules(job: dict[str, Any], ctx: Context, env: dict[str, str]) -> RuleOutcome:
@@ -31,38 +48,79 @@ def apply_rules(job: dict[str, Any], ctx: Context, env: dict[str, str]) -> RuleO
 
 
 def _eval_rules(rules: list[Any], ctx: Context, env: dict[str, str]) -> RuleOutcome:
-    for rule in rules:
+    evaluations: list[_RuleTrace] = []
+    matched_outcome: RuleOutcome | None = None
+
+    for idx, rule in enumerate(rules):
         if not isinstance(rule, dict):
-            continue
-        if not _rule_matches(rule, ctx, env):
+            evaluations.append(_RuleTrace(
+                index=idx, rule={}, matched=False,
+                reason=f"unrecognised rule entry: {rule!r}",
+            ))
             continue
         when = rule.get("when", "on_success")
+        if matched_outcome is not None:
+            # Already matched earlier; just record this rule as not-evaluated.
+            evaluations.append(_RuleTrace(
+                index=idx, rule=dict(rule), matched=False,
+                reason="not evaluated — earlier rule matched",
+                when=str(when),
+            ))
+            continue
+        ok, reason = _rule_matches(rule, ctx, env)
+        evaluations.append(_RuleTrace(
+            index=idx, rule=dict(rule), matched=ok, reason=reason, when=str(when),
+        ))
+        if not ok:
+            continue
         if when == "never":
-            return RuleOutcome(dropped=True, matched_rule=rule)
-        return RuleOutcome(
+            matched_outcome = RuleOutcome(
+                dropped=True,
+                matched_rule=rule,
+                matched_index=idx,
+                drop_reason=f"rule[{idx}] matched with when:never ({reason})",
+            )
+            continue
+        matched_outcome = RuleOutcome(
             when=when,
             allow_failure=rule.get("allow_failure"),
             extra_variables={str(k): str(v) for k, v in (rule.get("variables") or {}).items()},
             matched_rule=rule,
+            matched_index=idx,
         )
-    # No rule matched: job is dropped (matches GitLab default).
-    return RuleOutcome(dropped=True)
+
+    if matched_outcome is None:
+        matched_outcome = RuleOutcome(
+            dropped=True,
+            drop_reason="no rule matched",
+        )
+    matched_outcome.evaluations = evaluations
+    return matched_outcome
 
 
-def _rule_matches(rule: dict[str, Any], ctx: Context, env: dict[str, str]) -> bool:
+def _rule_matches(rule: dict[str, Any], ctx: Context, env: dict[str, str]) -> tuple[bool, str]:
+    """Return (matched, reason). Reason describes the deciding clause for either outcome."""
+    parts: list[str] = []
     if "if" in rule:
-        if not eval_if(str(rule["if"]), env):
-            return False
+        expr = str(rule["if"])
+        if not eval_if(expr, env):
+            return False, f"if false: {expr}"
+        parts.append(f"if true: {expr}")
     if "changes" in rule:
         patterns = rule["changes"]
         if isinstance(patterns, dict):
             patterns = patterns.get("paths", [])
-        if not _changes_match(patterns or [], ctx.changed_files):
-            return False
+        ok, det = _changes_match_explained(patterns or [], ctx.changed_files)
+        if not ok:
+            return False, f"changes no match: {det}"
+        parts.append(f"changes match: {det}")
     if "exists" in rule:
         if not _exists_match(rule["exists"]):
-            return False
-    return True
+            return False, f"exists no match: {rule['exists']}"
+        parts.append(f"exists match: {rule['exists']}")
+    if not parts:
+        return True, "no clauses (always matches)"
+    return True, "; ".join(parts)
 
 
 def _eval_only_except(job: dict[str, Any], ctx: Context, env: dict[str, str]) -> RuleOutcome:
@@ -293,14 +351,18 @@ def _ref_matches(spec: str, ctx: Context) -> bool:
 
 
 def _changes_match(patterns: list[str], changed: list[str]) -> bool:
+    return _changes_match_explained(patterns, changed)[0]
+
+
+def _changes_match_explained(patterns: list[str], changed: list[str]) -> tuple[bool, str]:
     if not changed:
         # No changed-file context provided: be permissive.
-        return True
+        return True, "no changed-file context (permissive)"
     for p in patterns:
         for f in changed:
             if fnmatch.fnmatch(f, p):
-                return True
-    return False
+                return True, f"{f!r} ~ {p!r}"
+    return False, f"none of {changed!r} matched any of {patterns!r}"
 
 
 def _exists_match(spec: Any) -> bool:
