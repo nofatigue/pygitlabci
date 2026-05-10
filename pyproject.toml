@@ -1,6 +1,6 @@
 [project]
 name = "gitlabci-sim"
-version = "0.2.0"
+version = "0.2.2"
 description = "Simulate GitLab CI pipelines from a folder of YAML files"
 readme = "README.md"
 authors = [
