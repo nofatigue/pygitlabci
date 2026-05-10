@@ -25,32 +25,38 @@
     {% endif %}
   </p>
 
-  <h2>DAG</h2>
+  <h2>DAG <span class="muted">(triggered jobs only)</span></h2>
   <div class="dag-wrap">
     <pre class="mermaid" data-source="{{ mermaid_source }}">{{ mermaid_source }}</pre>
   </div>
 
-  {% if not_triggered_jobs %}
-    <details class="not-triggered-dag">
-      <summary>Show full DAG (with {{ not_triggered_jobs | length }} not-triggered job{{ '' if not_triggered_jobs|length == 1 else 's' }} dimmed)</summary>
-      <div class="dag-wrap">
-        <pre class="mermaid" data-source="{{ mermaid_full_source }}">{{ mermaid_full_source }}</pre>
-      </div>
-    </details>
+  <details class="not-triggered-dag">
+    <summary>
+      Show full DAG
+      {% if not_triggered_jobs %}
+        <span class="muted">(includes {{ not_triggered_jobs | length }} not-triggered job{{ '' if not_triggered_jobs|length == 1 else 's' }}, dimmed)</span>
+      {% else %}
+        <span class="muted">(no not-triggered jobs in this run — same as above)</span>
+      {% endif %}
+    </summary>
+    <div class="dag-wrap">
+      <pre class="mermaid" data-source="{{ mermaid_full_source }}">{{ mermaid_full_source }}</pre>
+    </div>
+  </details>
 
+  {% if not_triggered_jobs %}
     <details class="not-triggered-list">
       <summary>Not-triggered jobs ({{ not_triggered_jobs | length }})</summary>
       <table class="jobs">
         <thead>
-          <tr><th>job</th><th>stage</th><th>reason</th><th>matched rule #</th></tr>
+          <tr><th>job</th><th>stage</th><th>reason</th></tr>
         </thead>
         <tbody>
           {% for job in not_triggered_jobs %}
             <tr class="status-not_triggered">
               <td><code>{{ job.name }}</code></td>
               <td class="dim">{{ job.stage }}</td>
-              <td class="dim">{{ job.not_triggered_reason or "—" }}</td>
-              <td class="dim">{% if job.matched_rule_index is not none %}{{ job.matched_rule_index }}{% else %}—{% endif %}</td>
+              <td class="reason-cell">{% include "_rule_trace.html" %}</td>
             </tr>
           {% endfor %}
         </tbody>
@@ -76,7 +82,7 @@
         </header>
         <table class="jobs">
           <thead>
-            <tr><th>job</th><th>when</th><th>status</th><th>actions</th></tr>
+            <tr><th>job</th><th>when</th><th>status</th><th>reason</th><th>actions</th></tr>
           </thead>
           <tbody>
           {% for job in jobs %}
@@ -85,6 +91,7 @@
               <td><code>{{ job.name }}</code></td>
               <td class="dim">{{ job.when }}</td>
               <td><span class="status-pill status-{{ run.status }}">{{ run.status }}</span></td>
+              <td class="reason-cell">{% include "_rule_trace.html" %}</td>
               <td>
                 {% if job.name in session.state.ready %}
                   <form class="inline" hx-post="/sessions/{{ session.id }}/apply" hx-target="#panel">

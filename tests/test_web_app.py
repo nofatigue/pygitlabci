@@ -198,6 +198,64 @@ def test_index_with_empty_examples_dir_shows_empty_message(
         pass
 
 
+def test_panel_always_renders_both_dags_with_full_dag_hidden(
+    client: TestClient, examples_dir: Path
+) -> None:
+    """Default DAG visible; full DAG (incl. not-triggered, dimmed) inside a closed
+    <details>. Both must always be in the DOM so the user can toggle without reloading."""
+    resp = client.post(
+        "/sessions",
+        data={"path": str(examples_dir / "with_includes"), "ref": "feature/x"},
+    )
+    assert resp.status_code == 200
+    # First DAG: a plain <pre class="mermaid"> not inside the not-triggered-dag block.
+    assert resp.text.count('<pre class="mermaid"') == 2
+    # Second DAG lives inside <details class="not-triggered-dag"> — closed by default
+    # (no `open` attribute on it).
+    assert 'details class="not-triggered-dag"' in resp.text
+    # The second mermaid element renders the dimmed style classDef.
+    assert "classDef not_triggered" in resp.text
+    # Defensive: a closed <details> won't have ` open` before `<summary>`.
+    pre_summary = resp.text.split("<summary>")[0]
+    assert "<details class=\"not-triggered-dag\" open" not in pre_summary
+
+
+def test_panel_per_job_reason_column_has_clickable_rule_trace(
+    client: TestClient, examples_dir: Path
+) -> None:
+    """Every triggered job row gets a `reason-cell` with a `<details>` summary; opening
+    it reveals a per-rule trace table."""
+    resp = client.post(
+        "/sessions",
+        data={"path": str(examples_dir / "with_includes"), "ref": "main"},
+    )
+    assert resp.status_code == 200
+    assert "<th>reason</th>" in resp.text
+    assert 'class="reason-cell"' in resp.text
+    # `deploy_app` matches its first rule on main → "rule[0] matched" headline +
+    # the rule-trace mini-table.
+    assert "rule[0] matched" in resp.text
+    assert 'class="rule-trace"' in resp.text
+    # The mini-table rows render the if-clause body and the matched flag.
+    assert "$CI_COMMIT_REF_NAME" in resp.text
+
+
+def test_panel_not_triggered_section_uses_same_rule_trace(
+    client: TestClient, examples_dir: Path
+) -> None:
+    """When jobs are dropped by rules, the not-triggered list shows the same clickable
+    trace cell so the user can see *why* without leaving the page."""
+    resp = client.post(
+        "/sessions",
+        data={"path": str(examples_dir / "with_includes"), "ref": "feature/x"},
+    )
+    assert resp.status_code == 200
+    assert "Not-triggered jobs (1)" in resp.text
+    assert "deploy_app" in resp.text
+    # The drop reason headline appears in the not-triggered table too.
+    assert "when:never" in resp.text
+
+
 def test_clicking_example_button_creates_session(
     client: TestClient, examples_dir: Path
 ) -> None:

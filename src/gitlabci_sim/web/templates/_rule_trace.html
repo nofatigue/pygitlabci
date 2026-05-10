@@ -1,0 +1,33 @@
+{# Inline rule-trace cell. Pass the Job as `job`. Renders a clickable <details>
+   summary with the headline reason; when opened, shows every rule evaluation
+   in a mini-table. #}
+{% if job.rules_evaluation %}
+  {% if not job.triggered %}
+    {% set headline = job.not_triggered_reason or 'not triggered' %}
+  {% elif job.matched_rule_index is not none %}
+    {% set headline = 'rule[' ~ job.matched_rule_index ~ '] matched' %}
+  {% else %}
+    {% set headline = 'matched' %}
+  {% endif %}
+  <details class="reason-details">
+    <summary class="reason-summary">{{ headline }}</summary>
+    <table class="rule-trace">
+      <thead>
+        <tr><th>#</th><th></th><th>when</th><th>rule</th><th>reason</th></tr>
+      </thead>
+      <tbody>
+        {% for ev in job.rules_evaluation %}
+          <tr class="rule-row{% if ev.matched %} matched{% endif %}">
+            <td class="dim">{{ ev.index }}</td>
+            <td>{% if ev.matched %}<span class="check">✓</span>{% else %}<span class="dim">·</span>{% endif %}</td>
+            <td class="dim">{{ ev.when or '-' }}</td>
+            <td><code>{% for k, v in ev.rule.items() %}{{ k }}={{ v|tojson }}{% if not loop.last %}, {% endif %}{% endfor %}{% if not ev.rule %}-{% endif %}</code></td>
+            <td>{{ ev.reason }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+{% else %}
+  <span class="dim">— (no rules)</span>
+{% endif %}

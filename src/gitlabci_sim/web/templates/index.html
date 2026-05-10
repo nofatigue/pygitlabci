@@ -15,14 +15,21 @@
       maxTextSize: 500000,
       maxEdges: 5000,
     });
-    async function rerender() {
-      const nodes = document.querySelectorAll('.mermaid');
+    async function rerender(scope) {
+      const root = scope || document;
+      const nodes = root.querySelectorAll('.mermaid');
       if (!nodes.length) return;
       nodes.forEach(n => { n.removeAttribute('data-processed'); n.innerHTML = n.dataset.source || n.textContent; });
       await mermaid.run({ nodes });
     }
-    document.body.addEventListener('htmx:afterSwap', rerender);
-    document.addEventListener('DOMContentLoaded', rerender);
+    // Mermaid can fail to size SVGs inside a closed <details>. Re-run when one opens.
+    document.body.addEventListener('toggle', (ev) => {
+      if (ev.target instanceof HTMLDetailsElement && ev.target.open) {
+        rerender(ev.target);
+      }
+    }, true);
+    document.body.addEventListener('htmx:afterSwap', () => rerender());
+    document.addEventListener('DOMContentLoaded', () => rerender());
   </script>
 </head>
 <body>
