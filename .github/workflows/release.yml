@@ -35,7 +35,7 @@ jobs:
 
       - name: Run tests against the wheel
         run: |
-          uv sync --extra dev --extra web
+          uv sync --extra dev
           uv run pytest
 
       - name: Create GitHub Release with artifacts

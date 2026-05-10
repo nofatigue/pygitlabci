@@ -118,10 +118,9 @@ uv run sim graph examples/needs_dag
 
 Outputs Mermaid (`graph LR ...`); paste into any Mermaid renderer.
 
-## Web UI (optional `[web]` extra)
+## Web UI
 
 ```sh
-uv sync --extra web                          # or: pip install gitlabci-sim[web]
 uv run sim-web                               # http://127.0.0.1:8765
 uv run sim-web --examples /some/folder       # browse a different examples dir
 uv run sim-web --host 0.0.0.0 --port 9000
