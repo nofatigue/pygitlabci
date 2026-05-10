@@ -11,3 +11,18 @@ wheels/
 
 # Scratch / throwaway scripts and probes
 scratch/
+
+# claude
+.bash_profile
+.bashrc
+.claude/
+.gitconfig
+.gitmodules
+.idea
+.mcp.json
+.profile
+.ripgreprc
+.zprofile
+.zshrc
+
+.vscode
