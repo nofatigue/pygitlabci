@@ -76,7 +76,12 @@ class Job(BaseModel):
     not_triggered_reason: str | None = None
 
 
-class Pipeline(BaseModel):
+class CompiledPipeline(BaseModel):
+    """Raw pipeline data model — what `compile_pipeline` returns.
+
+    For tests and ergonomic loading, use `gitlabci_sim.Pipeline` instead, which wraps
+    this model with a one-liner constructor that resolves includes and references.
+    """
     model_config = ConfigDict(extra="forbid")
     stages: list[str]
     jobs: dict[str, Job]
@@ -93,12 +98,12 @@ class JobRun(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
     status: JobStatus
-    child_pipeline: Pipeline | None = None
+    child_pipeline: CompiledPipeline | None = None
 
 
 class PipelineState(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    pipeline: Pipeline
+    pipeline: CompiledPipeline
     runs: dict[str, JobRun] = Field(default_factory=dict)
     ready: list[str] = Field(default_factory=list)
     finished: bool = False

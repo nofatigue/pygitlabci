@@ -15,6 +15,102 @@ to GitLab.
 uv sync --extra dev
 ```
 
+## Python API
+
+For tests and scripts, the high-level entrypoint is a one-liner:
+
+```python
+from gitlabci_sim import Pipeline, Context
+
+pipe = Pipeline("path/to/repo", Context.push(ref="main"))
+
+pipe.jobs           # dict[str, Job] — triggered jobs after rules
+pipe.not_triggered  # jobs filtered out by rules
+pipe.stages         # list[str]
+pipe.edges          # list[(src, dst)] — the DAG
+pipe.warnings       # include-resolution warnings (remote skips, missing templates)
+pipe.compiled       # the underlying CompiledPipeline pydantic model (for serialisation)
+```
+
+`Pipeline(path, ctx)` accepts either a directory (looks for `.gitlab-ci.yml`) or a YAML
+file. Use `Pipeline.from_string(yaml_text, ctx)` to compile inline YAML (single-file).
+
+### Context
+
+Construct a `Context` directly, or use the factories for common pipeline shapes:
+
+```python
+Context.push(ref="main", changed=["src/a.py"])
+Context.tag("v1.2.3")
+Context.mr(source="feat/x", target="main", changed=["src/a.py"], labels=["bug"])
+```
+
+Each factory sets `pipeline_source` and the right `CI_*` predefined vars (MR pipelines
+omit `CI_COMMIT_BRANCH`, tag pipelines set `CI_COMMIT_TAG`, etc.).
+
+### Pytest helpers
+
+`gitlabci_sim.testing` ships a `PipelineTesting` wrapper with declarative assertions:
+
+```python
+from gitlabci_sim import Pipeline, Context
+from gitlabci_sim.testing import PipelineTesting, JobPattern
+
+def test_main_pipeline():
+    pipe = Pipeline("examples/starforge", Context.push(ref="main"))
+    t = PipelineTesting(pipe)
+
+    t.assert_jobs_exist(["lint:python", "build:api", "deploy:api:staging"])
+    t.assert_job_exists(JobPattern(name="deploy:api:prod", when="manual"))
+    t.assert_jobs_not_exist(["deploy:legacy"])
+    t.assert_jobs_exactly([...])              # whole-set equality
+    t.assert_no_warnings()
+
+def test_mr_drops_production():
+    pipe = Pipeline("examples/starforge", Context.mr(source="feat/x", target="main"))
+    PipelineTesting(pipe).assert_jobs_not_exist([
+        "deploy:api:prod", "deploy:web:prod", "verify:production",
+    ])
+
+def test_workflow_drops_off_main():
+    pipe = Pipeline("examples/starforge", Context.push(ref="topic/x"))
+    PipelineTesting(pipe).assert_workflow_dropped()
+```
+
+`JobPattern` is a declarative matcher; all fields are AND-ed:
+
+```python
+JobPattern(
+    name="deploy:prod",          # exact name
+    name_regex=r"deploy:.*prod", # regex over the name (fullmatch)
+    stage="deploy",
+    when="manual",
+    allow_failure=False,
+    trigger_kind="child_local",  # for trigger:include: jobs
+    needs_contains=["build:api"],
+    extends_contains=[".docker_build"],
+    script_contains=["make build"],
+    variables_contains={"ENV": "prod"},
+)
+```
+
+PipelineTesting assertions:
+
+| method | what it checks |
+|---|---|
+| `assert_job_exists(name_or_pattern)` | returns the (first) matching Job |
+| `assert_jobs_exist([names_or_patterns])` | reports all misses in one error |
+| `assert_job_not_exists(name_or_pattern)` | |
+| `assert_jobs_not_exist([...])` | |
+| `assert_jobs_exactly([names])` | whole-set equality (missing + unexpected) |
+| `assert_workflow_dropped()` | `workflow:rules:` produced `when: never` |
+| `assert_workflow_runs()` | inverse of the above |
+| `assert_no_jobs()` | zero triggered jobs |
+| `assert_job_count(triggered=, not_triggered=)` | |
+| `assert_no_warnings()` | include resolution produced no warnings |
+| `match_jobs(pattern) -> list[Job]` | the building block; returns matching jobs |
+| `match_not_triggered(pattern)` | same, over `pipeline.not_triggered` |
+
 ## Quickstart
 
 ### Inspect the merged config

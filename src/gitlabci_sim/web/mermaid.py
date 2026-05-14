@@ -9,7 +9,7 @@ run on a different ref/source?" exploration. The web UI hides this view by defau
 """
 from __future__ import annotations
 
-from gitlabci_sim.model import JobRun, Pipeline
+from gitlabci_sim.model import CompiledPipeline, JobRun
 
 _STATUS_STYLES: dict[str, str] = {
     "success": "fill:#c8f7c5,stroke:#2e7d32,color:#000",
@@ -28,7 +28,7 @@ def _mermaid_id(name: str) -> str:
 
 
 def render_dag(
-    pipeline: Pipeline,
+    pipeline: CompiledPipeline,
     runs: dict[str, JobRun],
     include_not_triggered: bool = False,
 ) -> str:
@@ -79,7 +79,7 @@ def render_dag(
     return "\n".join(lines)
 
 
-def _not_triggered_edges(pipeline: Pipeline) -> list[tuple[str, str]]:
+def _not_triggered_edges(pipeline: CompiledPipeline) -> list[tuple[str, str]]:
     """Best-effort edges for not-triggered jobs.
 
     `pipeline.edges` only covers triggered jobs; we add dashed edges from each

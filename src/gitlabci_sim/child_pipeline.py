@@ -20,11 +20,11 @@ from pathlib import Path
 from .compiler import compile_pipeline
 from .includes import resolve_includes
 from .loader import resolve_references
-from .model import Job, JobRun, Need, Pipeline, PipelineState
+from .model import CompiledPipeline, Job, JobRun, Need, PipelineState
 from .variables import Context
 
 
-def load_child_pipeline_from_yaml(path: Path, ctx: Context | None = None) -> Pipeline:
+def load_child_pipeline_from_yaml(path: Path, ctx: Context | None = None) -> CompiledPipeline:
     res = resolve_includes(path)
     merged = resolve_references(res.merged)
     return compile_pipeline(merged, ctx or Context(), source_files=res.source_files)
@@ -33,7 +33,7 @@ def load_child_pipeline_from_yaml(path: Path, ctx: Context | None = None) -> Pip
 def attach_child_pipeline(
     state: PipelineState,
     parent_job_name: str,
-    child: Pipeline,
+    child: CompiledPipeline,
 ) -> PipelineState:
     """Splice a child pipeline into `state` under the given parent job.
 
@@ -68,8 +68,8 @@ def attach_child_pipeline(
     return _recompute(spliced)
 
 
-def _splice(parent: Pipeline, parent_job: str, child: Pipeline) -> Pipeline:
-    """Return a new Pipeline with child's jobs/stages folded in.
+def _splice(parent: CompiledPipeline, parent_job: str, child: CompiledPipeline) -> CompiledPipeline:
+    """Return a new CompiledPipeline with child's jobs/stages folded in.
 
     Every child job gains a synthetic `needs:` on the parent so it can't run until the
     trigger job succeeds — matches GitLab parent-child semantics.
@@ -119,7 +119,7 @@ def _splice(parent: Pipeline, parent_job: str, child: Pipeline) -> Pipeline:
         for n in job.needs:
             new_edges.append((_prefix(parent_job, n.job), prefixed))
 
-    return Pipeline(
+    return CompiledPipeline(
         stages=new_stages,
         jobs=new_jobs,
         edges=new_edges,

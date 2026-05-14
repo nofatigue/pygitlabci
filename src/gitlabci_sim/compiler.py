@@ -1,4 +1,4 @@
-"""Compile a merged GitLab CI config into the canonical Pipeline model.
+"""Compile a merged GitLab CI config into the canonical CompiledPipeline model.
 
 Pipeline assembly order:
 1. Resolve includes + !reference (done by caller).
@@ -13,7 +13,7 @@ from copy import deepcopy
 from typing import Any
 
 from .extends import is_job_key, resolve_all_extends
-from .model import Job, Need, Pipeline, RuleEvaluation, Trigger
+from .model import CompiledPipeline, Job, Need, RuleEvaluation, Trigger
 from .rules import apply_rules
 from .variables import Context, expand, merge_env
 
@@ -21,21 +21,21 @@ DEFAULT_STAGES = [".pre", "build", "test", "deploy", ".post"]
 
 
 class CompileError(ValueError):
-    """Raised when a config cannot be compiled into a valid Pipeline."""
+    """Raised when a config cannot be compiled into a valid CompiledPipeline."""
 
 
 def compile_pipeline(
     config: dict[str, Any],
     context: Context | None = None,
     source_files: list[str] | None = None,
-) -> Pipeline:
+) -> CompiledPipeline:
     ctx = context or Context()
 
     cfg = deepcopy(config)
     stages = _resolve_stages(cfg)
     workflow_when = _resolve_workflow(cfg, ctx)
     if workflow_when == "never":
-        return Pipeline(
+        return CompiledPipeline(
             stages=stages,
             jobs={},
             edges=[],
@@ -131,7 +131,7 @@ def compile_pipeline(
     _validate_needs(jobs)
     edges = _compute_edges(jobs, stages)
 
-    return Pipeline(
+    return CompiledPipeline(
         stages=stages,
         jobs=jobs,
         edges=edges,

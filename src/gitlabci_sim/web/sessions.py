@@ -18,7 +18,7 @@ from gitlabci_sim.child_pipeline import attach_static_child_pipelines
 from gitlabci_sim.compiler import compile_pipeline
 from gitlabci_sim.includes import resolve_includes
 from gitlabci_sim.loader import resolve_references
-from gitlabci_sim.model import JobStatus, Pipeline, PipelineState
+from gitlabci_sim.model import CompiledPipeline, JobStatus, PipelineState
 from gitlabci_sim.simulator import apply as sim_apply
 from gitlabci_sim.simulator import initial_state
 from gitlabci_sim.variables import Context
@@ -27,7 +27,7 @@ from gitlabci_sim.variables import Context
 @dataclass
 class Session:
     id: str
-    pipeline: Pipeline
+    pipeline: CompiledPipeline
     ctx: Context
     root: Path
     state: PipelineState
@@ -46,7 +46,7 @@ def _resolve_target(target: Path) -> Path:
     raise FileNotFoundError(f"path does not exist: {target}")
 
 
-def _build(target: Path, ctx: Context) -> tuple[Pipeline, Path, list[str]]:
+def _build(target: Path, ctx: Context) -> tuple[CompiledPipeline, Path, list[str]]:
     root = _resolve_target(target)
     result = resolve_includes(root)
     merged = resolve_references(result.merged)
@@ -54,7 +54,7 @@ def _build(target: Path, ctx: Context) -> tuple[Pipeline, Path, list[str]]:
     return pipeline, root, list(result.warnings)
 
 
-def _initial(pipeline: Pipeline, root: Path, ctx: Context) -> PipelineState:
+def _initial(pipeline: CompiledPipeline, root: Path, ctx: Context) -> PipelineState:
     state = initial_state(pipeline)
     return attach_static_child_pipelines(state, root.parent, ctx)
 

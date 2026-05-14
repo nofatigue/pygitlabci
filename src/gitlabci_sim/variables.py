@@ -30,6 +30,75 @@ class Context:
     mr_title: str | None = None
     mr_labels: list[str] = field(default_factory=list)
 
+    @classmethod
+    def push(
+        cls,
+        ref: str = "main",
+        *,
+        changed: list[str] | None = None,
+        variables: dict[str, str] | None = None,
+        commit_sha: str | None = None,
+        project_path: str = "group/project",
+    ) -> Context:
+        """A branch-push pipeline. Sets `pipeline_source='push'`, populates CI_COMMIT_BRANCH."""
+        return cls(
+            ref=ref,
+            pipeline_source="push",
+            changed_files=list(changed or []),
+            extra=dict(variables or {}),
+            commit_sha=commit_sha or ("0" * 40),
+            project_path=project_path,
+        )
+
+    @classmethod
+    def tag(
+        cls,
+        name: str,
+        *,
+        variables: dict[str, str] | None = None,
+        commit_sha: str | None = None,
+        project_path: str = "group/project",
+    ) -> Context:
+        """A tag-release pipeline. Sets `pipeline_source='tag'`, CI_COMMIT_TAG=name,
+        and omits CI_COMMIT_BRANCH (matching real GitLab tag pipelines)."""
+        return cls(
+            ref=name,
+            pipeline_source="tag",
+            extra=dict(variables or {}),
+            commit_sha=commit_sha or ("0" * 40),
+            project_path=project_path,
+        )
+
+    @classmethod
+    def mr(
+        cls,
+        *,
+        source: str = "feature/x",
+        target: str = "main",
+        changed: list[str] | None = None,
+        iid: int | None = None,
+        title: str | None = None,
+        labels: list[str] | None = None,
+        variables: dict[str, str] | None = None,
+        commit_sha: str | None = None,
+        project_path: str = "group/project",
+    ) -> Context:
+        """A merge-request pipeline. Sets `pipeline_source='merge_request_event'` and the
+        CI_MERGE_REQUEST_* predefined vars; omits CI_COMMIT_BRANCH (matching real MR pipelines)."""
+        return cls(
+            ref=source,
+            pipeline_source="merge_request_event",
+            changed_files=list(changed or []),
+            extra=dict(variables or {}),
+            commit_sha=commit_sha or ("0" * 40),
+            project_path=project_path,
+            mr_iid=iid,
+            mr_source_branch=source,
+            mr_target_branch=target,
+            mr_title=title,
+            mr_labels=list(labels or []),
+        )
+
     def predefined(self) -> dict[str, str]:
         env: dict[str, str] = {
             "CI": "true",

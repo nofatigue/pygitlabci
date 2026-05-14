@@ -1,15 +1,15 @@
 """Mermaid renderer regression coverage."""
 from __future__ import annotations
 
-from gitlabci_sim.model import Job, JobRun, Pipeline
+from gitlabci_sim.model import CompiledPipeline, Job, JobRun
 from gitlabci_sim.web.mermaid import render_dag
 
 
-def _pipeline_with_stage_and_job_sharing_a_name() -> Pipeline:
+def _pipeline_with_stage_and_job_sharing_a_name() -> CompiledPipeline:
     # A `lint` job in a `lint` stage — the v1 renderer used the same id for
     # both the subgraph and the node, which Mermaid 11 rejects with
     # "Syntax error in text".
-    return Pipeline(
+    return CompiledPipeline(
         stages=["lint", "build"],
         jobs={
             "lint": Job(name="lint", stage="lint", script=["echo lint"]),

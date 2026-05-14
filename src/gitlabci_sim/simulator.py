@@ -21,13 +21,13 @@ Gating rules:
 """
 from __future__ import annotations
 
-from .model import Job, JobRun, JobStatus, Pipeline, PipelineState
+from .model import CompiledPipeline, Job, JobRun, JobStatus, PipelineState
 
 TERMINAL: set[str] = {"success", "failed", "skipped", "canceled"}
 PASSING_FOR_DOWNSTREAM: set[str] = {"success", "skipped"}
 
 
-def initial_state(pipeline: Pipeline) -> PipelineState:
+def initial_state(pipeline: CompiledPipeline) -> PipelineState:
     runs: dict[str, JobRun] = {}
     for name, job in pipeline.jobs.items():
         if job.when == "manual":
@@ -79,7 +79,7 @@ def _recompute(state: PipelineState) -> PipelineState:
     return PipelineState(pipeline=pipe, runs=runs, ready=ready, finished=finished)
 
 
-def _build_upstream(pipe: Pipeline) -> dict[str, list[str]]:
+def _build_upstream(pipe: CompiledPipeline) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {n: [] for n in pipe.jobs}
     stage_idx = {s: i for i, s in enumerate(pipe.stages)}
     by_stage: dict[str, list[str]] = {s: [] for s in pipe.stages}
@@ -110,7 +110,7 @@ def _gates_satisfied(job: Job, ups: list[str], runs: dict[str, JobRun]) -> bool:
     return True
 
 
-def _any_real_failure(pipe: Pipeline, ups: list[str], runs: dict[str, JobRun]) -> bool:
+def _any_real_failure(pipe: CompiledPipeline, ups: list[str], runs: dict[str, JobRun]) -> bool:
     """True iff any upstream failed AND was not marked allow_failure."""
     for up in ups:
         run = runs.get(up)
@@ -123,7 +123,7 @@ def _any_real_failure(pipe: Pipeline, ups: list[str], runs: dict[str, JobRun]) -
     return False
 
 
-def _any_blocking(pipe: Pipeline, ups: list[str], runs: dict[str, JobRun]) -> bool:
+def _any_blocking(pipe: CompiledPipeline, ups: list[str], runs: dict[str, JobRun]) -> bool:
     """True iff any upstream completed in a way that prevents a success-gated downstream
     from running: a non-allow_failure failure, or a skipped job (which never produced
     its outputs)."""
